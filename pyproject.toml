@@ -34,3 +34,6 @@ select = ["E", "F", "I", "W", "UP", "B"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+  "smoke: real-SCM smoke tests (slow; need calibration sets and, for MAGICC, the licensed binary)",
+]
