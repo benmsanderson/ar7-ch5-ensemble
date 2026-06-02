@@ -21,7 +21,7 @@ the physical ``Emissions|CO2|AFOLU`` and drop ``[NGHGI]`` (see the brief).
 from __future__ import annotations
 
 import json
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from pathlib import Path
 
 import pandas as pd
@@ -173,6 +173,57 @@ def load_sci_infilled(
         canonicalised to the adapter convention.
     """
     path = Path(path)
+    df = _prepare_sci_frame(path, region=region, sheet=sheet)
+    if scenario is not None:
+        df = df[df["scenario"] == scenario]
+    if model is not None:
+        df = df[df["model"] == model]
+
+    if df.empty:
+        raise ValueError(
+            f"No SCI infilled rows survived filtering of {path} "
+            f"(scenario={scenario!r}, model={model!r}, region={region!r})."
+        )
+
+    run = scmdata.ScmRun(df)
+    if to_annual:
+        run = _interpolate_annual(run)
+    return run
+
+
+def iter_sci_infilled(
+    path: str | Path,
+    *,
+    region: str = "World",
+    sheet: str = "data",
+    to_annual: bool = True,
+) -> Iterator[tuple[str, str, scmdata.ScmRun]]:
+    """Yield ``(model, scenario, ScmRun)`` for every pathway in the SCI file.
+
+    Reads and canonicalises the worksheet once (via the CSV cache), then groups
+    by ``(model, scenario)`` and yields one driving-emissions ScmRun per
+    pathway. This is the batch entry point: it avoids re-reading the cache once
+    per scenario, which ``load_sci_infilled`` would do when looped.
+    """
+    path = Path(path)
+    df = _prepare_sci_frame(path, region=region, sheet=sheet)
+    for (model, scenario), group in df.groupby(["model", "scenario"], sort=True):
+        run = scmdata.ScmRun(group)
+        if to_annual:
+            run = _interpolate_annual(run)
+        yield str(model), str(scenario), run
+
+
+def _prepare_sci_frame(
+    path: Path, *, region: str, sheet: str
+) -> pd.DataFrame:
+    """Load the SCI sheet and return the canonicalised infilled-emissions rows.
+
+    Strips the infilled namespace, maps variable and unit names to the adapter
+    convention, keeps ``region`` only, and drops anything outside
+    :data:`CANONICAL_EMISSIONS`. All ``(model, scenario)`` pairs are retained;
+    callers filter further.
+    """
     df = load_sci_data_sheet(path, sheet=sheet)
     df.columns = [c.lower() if isinstance(c, str) else c for c in df.columns]
     missing = _REQUIRED_COLUMNS - set(df.columns)
@@ -188,22 +239,8 @@ def load_sci_infilled(
     df["unit"] = df["unit"].map(_canonicalise_unit)
 
     df = df[df["region"] == region]
-    if scenario is not None:
-        df = df[df["scenario"] == scenario]
-    if model is not None:
-        df = df[df["model"] == model]
     df = df[df["variable"].isin(CANONICAL_EMISSIONS)]
-
-    if df.empty:
-        raise ValueError(
-            f"No SCI infilled rows survived filtering of {path} "
-            f"(scenario={scenario!r}, model={model!r}, region={region!r})."
-        )
-
-    run = scmdata.ScmRun(df)
-    if to_annual:
-        run = _interpolate_annual(run)
-    return run
+    return df
 
 
 def _interpolate_annual(run: scmdata.ScmRun) -> scmdata.ScmRun:

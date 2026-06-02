@@ -18,6 +18,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from ar7_ch5.experiments.sci_ensemble import run_sci_batch
 from ar7_ch5.load import available_sci_scenarios, load_sci_infilled
 from ar7_ch5.runners import repo_root
 from ar7_ch5.runners.orchestrate import run_models
@@ -74,6 +75,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="List available (model, scenario) pairs and exit.",
     )
     parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Run the full SCI ensemble (every pathway), writing one NetCDF "
+        "per pathway. Resumable: re-running skips pathways already written. "
+        "Default --n-members for this mode is 200.",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="With --all, re-run and overwrite pathways already on disk.",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="With --all, process at most this many pathways (partial pass).",
+    )
+    parser.add_argument(
         "--output",
         default="outputs",
         help="Directory for run output (gitignored).",
@@ -94,6 +113,9 @@ def main(argv: list[str] | None = None) -> int:
         for iam, scenario in available_sci_scenarios(args.input):
             print(f"{iam}\t{scenario}")
         return 0
+
+    if args.all:
+        return _run_batch(args)
 
     iam, scenario = args.iam, args.scenario
     if iam is None or scenario is None:
@@ -119,6 +141,34 @@ def main(argv: list[str] | None = None) -> int:
 
     _report_gsat(result)
     return 0
+
+
+def _run_batch(args) -> int:
+    """Run the full SCI ensemble, one NetCDF per pathway (milestone 4)."""
+    n_members = 200 if args.n_members is None else args.n_members
+    out_dir = Path(args.output) / "sci"
+    print(
+        f"Running SCI ensemble through {args.models} at n_members={n_members} "
+        f"-> {out_dir} (one NetCDF per pathway, resumable)."
+    )
+    results = run_sci_batch(
+        args.input,
+        args.models,
+        n_members=n_members,
+        output_dir=out_dir,
+        overwrite=args.overwrite,
+        limit=args.limit,
+    )
+    written = sum(r.status == "written" for r in results)
+    skipped = sum(r.status == "skipped" for r in results)
+    failed = [r for r in results if r.status == "failed"]
+    print(
+        f"Done: {written} written, {skipped} skipped, {len(failed)} failed "
+        f"({len(results)} pathways). Manifest: {out_dir / 'manifest.csv'}."
+    )
+    for r in failed:
+        print(f"  FAILED {r.scm} {r.iam}/{r.scenario}: {r.error}")
+    return 1 if failed else 0
 
 
 def _report_gsat(result) -> None:
