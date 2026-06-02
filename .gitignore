@@ -1,0 +1,33 @@
+# Input and output data (see docs/data_setup.md for how to obtain inputs)
+data/
+outputs/
+results/
+
+# Licensed / large external binaries (e.g. MAGICC); reference by env var instead
+magicc/
+*.MAGICC
+magicc-dist/
+
+# Pixi environment and lockfile cache
+.pixi/
+
+# Local path / secret overrides
+.env
+.env.local
+config/local.toml
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.ipynb_checkpoints/
+.pytest_cache/
+.ruff_cache/
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
