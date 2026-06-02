@@ -1,7 +1,76 @@
 """SCM run wrappers and orchestration.
 
-Thin, per-model configuration wrappers around the openscm-runner engine (FaIR
-2.x, CICERO-SCM 2.1.0, MAGICC), plus orchestrate.py which builds the
-(scenario, model, config) run plan and dispatches it. No mocking of the SCMs:
-tests hit the real adapters on small inputs.
+Thin, per-model builders around the openscm-runner engine (FaIR 2.x,
+CICERO-SCM 2.1.1, MAGICC v7.5.3). Each ``build_*`` returns a configured,
+AdapterLike object; ``orchestrate.run_models`` dispatches a list of them through
+``openscm_runner.run.run``. No mocking of the SCMs: tests hit the real adapters
+on small inputs.
+
+FaIR and CICERO-SCM are driven from external native calibration distributions
+(see resolve_fair_calibration / resolve_ciceroscm_calibration); MAGICC uses its
+licensed binary plus the AR6 probabilistic drawnset.
 """
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+# GSAT plus top-level forcing is enough to prove the engine integration in the
+# smoke test; the full diagnostic set is requested by later milestones.
+DEFAULT_OUTPUT_VARIABLES: tuple[str, ...] = (
+    "Surface Air Temperature Change",
+    "Effective Radiative Forcing",
+)
+
+MODEL_NAMES: tuple[str, ...] = ("fair", "ciceroscm", "magicc")
+
+
+def repo_root() -> Path:
+    """Repository root (three levels up from this file: runners/ar7_ch5/src)."""
+    return Path(__file__).resolve().parents[3]
+
+
+def _calibration_dir() -> Path:
+    return repo_root() / "data" / "calibration"
+
+
+def resolve_fair_calibration() -> Path:
+    """Path to the FaIR native calibration bundle (Zenodo 18828694 v1.6.0).
+
+    Override with ``AR7_FAIR_CALIBRATION``.
+    """
+    env = os.environ.get("AR7_FAIR_CALIBRATION")
+    if env:
+        return Path(env)
+    return _calibration_dir() / "fair-1.6.0"
+
+
+def resolve_ciceroscm_calibration() -> Path:
+    """Path to the CICERO-SCM native calibration directory (Zenodo 20506399).
+
+    Override with ``AR7_CICEROSCM_CALIBRATION``.
+    """
+    env = os.environ.get("AR7_CICEROSCM_CALIBRATION")
+    if env:
+        return Path(env)
+    return _calibration_dir() / "ciceroscm-rcmip3-v1.0.0"
+
+
+def resolve_magicc_drawnset() -> Path:
+    """Path to the MAGICC AR6 probabilistic drawnset JSON.
+
+    Override with ``MAGICC_PROBABILISTIC_FILE``; otherwise look under the
+    staged ``magicc-dist/ar6_prob`` directory (see docs/data_setup.md).
+    """
+    env = os.environ.get("MAGICC_PROBABILISTIC_FILE")
+    if env:
+        return Path(env)
+    base = Path("/storage/no-backup-nac/users/bensan/magicc-dist/ar6_prob")
+    matches = sorted(base.glob("*drawnset.json"))
+    if not matches:
+        raise FileNotFoundError(
+            "No MAGICC drawnset found. Set MAGICC_PROBABILISTIC_FILE to the "
+            "AR6 probabilistic drawnset JSON (see docs/data_setup.md)."
+        )
+    return matches[0]

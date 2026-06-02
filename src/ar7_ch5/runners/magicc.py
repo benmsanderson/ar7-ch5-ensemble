@@ -1,7 +1,54 @@
-"""MAGICC configuration and run wrapper.
+"""MAGICC v7.5.3 run wrapper.
 
-Configures MAGICC v7.5.3 for openscm-runner. The binary is licensed and lives
-outside the repo; point at it with MAGICC_EXECUTABLE_7 (see docs/data_setup.md).
-The AR6 probabilistic drawnset supplies the parameter ensemble. First exercised
-in the milestone 2 smoke test.
+Builds a configured ``MAGICC7`` adapter from the AR6 probabilistic drawnset
+(600 members). Each drawnset member supplies a full MAGICC namelist under
+``nml_allcfgs``; we lift those into per-member cfg dicts (lower-cased namelist
+keys, ``run_id`` from the member's ``paraset_id``). The licensed binary is
+located via ``MAGICC_EXECUTABLE_7`` (see docs/data_setup.md); the returned
+adapter is AdapterLike for ``orchestrate.run_models``.
 """
+
+from __future__ import annotations
+
+import json
+from collections.abc import Iterable, Sequence
+from typing import Any
+
+from openscm_runner.adapters import MAGICC7
+
+from . import DEFAULT_OUTPUT_VARIABLES, resolve_magicc_drawnset
+
+
+def _drawnset_cfgs(member_indices: Sequence[int] | None) -> list[dict[str, Any]]:
+    drawnset = json.loads(resolve_magicc_drawnset().read_text())
+    members = drawnset["configurations"]
+    if member_indices is not None:
+        members = [members[i] for i in member_indices]
+    return [
+        {
+            "run_id": member["paraset_id"],
+            **{k.lower(): v for k, v in member["nml_allcfgs"].items()},
+        }
+        for member in members
+    ]
+
+
+def build_magicc7(
+    *,
+    member_indices: Sequence[int] | None = None,
+    output_variables: Iterable[str] = DEFAULT_OUTPUT_VARIABLES,
+) -> MAGICC7:
+    """Configure MAGICC v7.5.3 from the AR6 probabilistic drawnset.
+
+    Parameters
+    ----------
+    member_indices
+        Zero-based rows of the 600-member drawnset to run. ``None`` runs the
+        full drawnset; the smoke test passes a short range.
+    output_variables
+        Diagnostics to extract.
+    """
+    return MAGICC7(
+        cfgs=_drawnset_cfgs(member_indices),
+        output_variables=tuple(output_variables),
+    )
