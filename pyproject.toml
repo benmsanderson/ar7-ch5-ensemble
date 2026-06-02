@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ar7-ch5"
+version = "0.1.0"
+description = "IPCC AR7 WG1 Chapter 5 climate runs: FaIR, CICERO-SCM and MAGICC across scenario ensembles via openscm-runner"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Ben Sanderson" }]
+
+# Runtime dependencies are managed by pixi (see pixi.toml), which is the single
+# source of truth for the environment. They are listed here only so the package
+# is installable with plain pip in a pinch.
+dependencies = [
+  "numpy",
+  "pandas>=2.2",
+  "openpyxl",
+  "pyam-iamc",
+  "scmdata",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ar7_ch5"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

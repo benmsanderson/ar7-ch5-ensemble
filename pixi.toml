@@ -1,0 +1,48 @@
+# Pixi is the single source of truth for the environment (matches the
+# ar7_wg1_ch5 convention so authors only learn one tool).
+#   pixi install        # build the environment
+#   pixi run test       # run the test suite
+#   pixi shell          # drop into the environment
+[workspace]
+name = "ar7-ch5-ensemble"
+version = "0.1.0"
+description = "AR7 WG1 Chapter 5 climate runs across FaIR, CICERO-SCM and MAGICC"
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-arm64"]
+
+[tasks]
+test = "pytest"
+lint = "ruff check ."
+format = "ruff format ."
+
+# Scientific base from conda-forge.
+[dependencies]
+python = "3.11.*"
+numpy = "*"
+pandas = ">=2.2"
+scipy = "*"
+openpyxl = "*"
+matplotlib = "*"
+tqdm = "*"
+pyyaml = "*"
+jupyterlab = "*"
+pytest = "*"
+ruff = "*"
+pip = "*"
+
+# Climate models, scenario IO, and the SCM engine.
+# The engine is pinned to Ben's modernised openscm-runner fork until the
+# upstream PRs land (see ar7-ch5-ensemble-brief.md, section 3).
+[pypi-dependencies]
+ar7-ch5 = { path = ".", editable = true }
+openscm-runner = { git = "https://github.com/benmsanderson/openscm-runner.git", branch = "modernisation/integration" }
+fair = ">=2.2.4"
+ciceroscm = "==2.1.0"
+pymagicc = "*"
+pyam-iamc = "*"
+scmdata = "*"
+
+# MAGICC needs the path to the licensed binary. Do not hardcode it here (it is
+# machine-specific); set it in your shell or a gitignored .env.local, e.g.
+#   export MAGICC_EXECUTABLE_7=/storage/no-backup-nac/users/bensan/magicc-dist/magicc7/bin/magicc
+# See docs/data_setup.md.
