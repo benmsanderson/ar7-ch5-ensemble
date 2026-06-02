@@ -20,7 +20,7 @@ from pathlib import Path
 
 from ar7_ch5.experiments.sci_ensemble import run_sci_batch
 from ar7_ch5.load import available_sci_scenarios, load_sci_infilled
-from ar7_ch5.runners import repo_root
+from ar7_ch5.runners import DEFAULT_MAX_WORKERS, repo_root
 from ar7_ch5.runners.orchestrate import run_models
 
 EXPERIMENTS = ["sci", "scenariomip_cmip7", "ssp2com", "rcmip3"]
@@ -93,6 +93,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="With --all, process at most this many pathways (partial pass).",
     )
     parser.add_argument(
+        "--max-workers",
+        type=int,
+        default=DEFAULT_MAX_WORKERS,
+        help="Worker-process cap per model run (CICERO-SCM, MAGICC). Models run "
+        f"one at a time, so this is the total concurrency. Default "
+        f"{DEFAULT_MAX_WORKERS}.",
+    )
+    parser.add_argument(
         "--output",
         default="outputs",
         help="Directory for run output (gitignored).",
@@ -129,7 +137,12 @@ def main(argv: list[str] | None = None) -> int:
         f"{scenarios['year'].min()}-{scenarios['year'].max()}."
     )
 
-    result = run_models(scenarios, args.models, n_members=args.n_members)
+    result = run_models(
+        scenarios,
+        args.models,
+        n_members=args.n_members,
+        max_workers=args.max_workers,
+    )
 
     out_dir = Path(args.output)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -158,6 +171,7 @@ def _run_batch(args) -> int:
         output_dir=out_dir,
         overwrite=args.overwrite,
         limit=args.limit,
+        max_workers=args.max_workers,
     )
     written = sum(r.status == "written" for r in results)
     skipped = sum(r.status == "skipped" for r in results)

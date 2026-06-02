@@ -25,6 +25,14 @@ DEFAULT_OUTPUT_VARIABLES: tuple[str, ...] = (
 
 MODEL_NAMES: tuple[str, ...] = ("fair", "ciceroscm", "magicc")
 
+# Cap on worker processes per model run. CICERO-SCM and MAGICC each fork a
+# ProcessPoolExecutor that otherwise defaults to ``cpu_count()`` (256 logical
+# cores on NAC). Models run one at a time, so this is also the total concurrent
+# worker count. Kept modest because NAC enforces strict memory overcommit
+# (``vm.overcommit_memory=2``): every fork must reserve commit equal to the
+# parent's virtual size, and hundreds of workers exhaust the commit headroom.
+DEFAULT_MAX_WORKERS: int = 12
+
 
 def repo_root() -> Path:
     """Repository root (three levels up from this file: runners/ar7_ch5/src)."""

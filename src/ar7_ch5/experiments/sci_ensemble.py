@@ -32,7 +32,11 @@ from pathlib import Path
 from tqdm import tqdm
 
 from ar7_ch5.load import available_sci_scenarios, iter_sci_infilled
-from ar7_ch5.runners import DEFAULT_OUTPUT_VARIABLES, MODEL_NAMES
+from ar7_ch5.runners import (
+    DEFAULT_MAX_WORKERS,
+    DEFAULT_OUTPUT_VARIABLES,
+    MODEL_NAMES,
+)
 from ar7_ch5.runners.orchestrate import run_models
 
 # Meta columns promoted to NetCDF dimensions within a single-model file.
@@ -84,6 +88,7 @@ def run_sci_batch(
     region: str = "World",
     overwrite: bool = False,
     limit: int | None = None,
+    max_workers: int | None = DEFAULT_MAX_WORKERS,
 ) -> list[PathwayResult]:
     """Run every SCI pathway through ``models``, one NetCDF per (pathway, model).
 
@@ -109,6 +114,8 @@ def run_sci_batch(
         batch resumable.
     limit
         Process at most this many pathways (for a quick partial pass).
+    max_workers
+        Worker-process cap per model run (see :data:`DEFAULT_MAX_WORKERS`).
 
     Returns
     -------
@@ -141,6 +148,7 @@ def run_sci_batch(
                 output_variables=output_variables,
                 out=out,
                 overwrite=overwrite,
+                max_workers=max_workers,
             )
             results.append(result)
             _append_manifest(manifest, result)
@@ -158,6 +166,7 @@ def _run_one(
     output_variables: tuple[str, ...],
     out: Path,
     overwrite: bool,
+    max_workers: int | None,
 ) -> PathwayResult:
     filename = pathway_filename(iam, scenario)
     target = out / scm / filename
@@ -170,7 +179,11 @@ def _run_one(
     start = time.perf_counter()
     try:
         result = run_models(
-            run, [scm], n_members=n_members, output_variables=output_variables
+            run,
+            [scm],
+            n_members=n_members,
+            output_variables=output_variables,
+            max_workers=max_workers,
         )
         _drop_unwritable_metadata(result)
         target.parent.mkdir(parents=True, exist_ok=True)

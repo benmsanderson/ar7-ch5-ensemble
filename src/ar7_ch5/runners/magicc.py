@@ -11,12 +11,13 @@ adapter is AdapterLike for ``orchestrate.run_models``.
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Iterable, Sequence
 from typing import Any
 
 from openscm_runner.adapters import MAGICC7
 
-from . import DEFAULT_OUTPUT_VARIABLES, resolve_magicc_drawnset
+from . import DEFAULT_MAX_WORKERS, DEFAULT_OUTPUT_VARIABLES, resolve_magicc_drawnset
 
 
 def _drawnset_cfgs(member_indices: Sequence[int] | None) -> list[dict[str, Any]]:
@@ -37,6 +38,7 @@ def build_magicc7(
     *,
     member_indices: Sequence[int] | None = None,
     output_variables: Iterable[str] = DEFAULT_OUTPUT_VARIABLES,
+    max_workers: int | None = DEFAULT_MAX_WORKERS,
 ) -> MAGICC7:
     """Configure MAGICC v7.5.3 from the AR6 probabilistic drawnset.
 
@@ -47,7 +49,14 @@ def build_magicc7(
         full drawnset; the smoke test passes a short range.
     output_variables
         Diagnostics to extract.
+    max_workers
+        Cap on MAGICC worker processes. The adapter otherwise forks
+        ``cpu_count()`` workers (read from ``MAGICC_WORKER_NUMBER`` via
+        openscm-runner's settings), which exhausts NAC's fork commit headroom.
+        ``None`` leaves the adapter default in place.
     """
+    if max_workers is not None:
+        os.environ["MAGICC_WORKER_NUMBER"] = str(max_workers)
     return MAGICC7(
         cfgs=_drawnset_cfgs(member_indices),
         output_variables=tuple(output_variables),

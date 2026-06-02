@@ -18,7 +18,7 @@ from collections.abc import Iterable, Sequence
 import openscm_runner.run
 import scmdata
 
-from . import DEFAULT_OUTPUT_VARIABLES, MODEL_NAMES
+from . import DEFAULT_MAX_WORKERS, DEFAULT_OUTPUT_VARIABLES, MODEL_NAMES
 from .ciceroscm import build_ciceroscmpy2
 from .fair import build_fair2
 from .magicc import build_magicc7
@@ -29,12 +29,16 @@ _BUILDERS = {
     "magicc": build_magicc7,
 }
 
+# Builders that accept a ``max_workers`` cap (FaIR runs in-process, no pool).
+_PARALLEL_BUILDERS = frozenset({"ciceroscm", "magicc"})
+
 
 def build_adapters(
     models: Sequence[str] = MODEL_NAMES,
     *,
     n_members: int | None = None,
     output_variables: Iterable[str] = DEFAULT_OUTPUT_VARIABLES,
+    max_workers: int | None = DEFAULT_MAX_WORKERS,
 ) -> list:
     """Construct the AdapterLike objects for ``models``.
 
@@ -47,6 +51,9 @@ def build_adapters(
         drawnset (the smoke-test ensemble size). ``None`` runs the full set.
     output_variables
         Diagnostics each adapter should extract.
+    max_workers
+        Worker-process cap for the parallel models (CICERO-SCM, MAGICC). FaIR
+        runs in-process and ignores it. See :data:`DEFAULT_MAX_WORKERS`.
     """
     unknown = [m for m in models if m not in _BUILDERS]
     if unknown:
@@ -55,13 +62,16 @@ def build_adapters(
         )
     member_indices = None if n_members is None else range(n_members)
     output_variables = tuple(output_variables)
-    return [
-        _BUILDERS[m](
-            member_indices=member_indices,
-            output_variables=output_variables,
-        )
-        for m in models
-    ]
+    adapters = []
+    for m in models:
+        kwargs = {
+            "member_indices": member_indices,
+            "output_variables": output_variables,
+        }
+        if m in _PARALLEL_BUILDERS:
+            kwargs["max_workers"] = max_workers
+        adapters.append(_BUILDERS[m](**kwargs))
+    return adapters
 
 
 def run_models(
@@ -70,14 +80,19 @@ def run_models(
     *,
     n_members: int | None = None,
     output_variables: Iterable[str] = DEFAULT_OUTPUT_VARIABLES,
+    max_workers: int | None = DEFAULT_MAX_WORKERS,
 ) -> scmdata.ScmRun:
     """Run ``models`` over ``scenarios`` and return the combined ScmRun.
 
     Builds one adapter per model and dispatches the list through
     ``openscm_runner.run.run``; results from all models are concatenated with a
-    ``climate_model`` meta column distinguishing them.
+    ``climate_model`` meta column distinguishing them. ``max_workers`` caps the
+    per-model worker pool (see :data:`DEFAULT_MAX_WORKERS`).
     """
     adapters = build_adapters(
-        models, n_members=n_members, output_variables=output_variables
+        models,
+        n_members=n_members,
+        output_variables=output_variables,
+        max_workers=max_workers,
     )
     return openscm_runner.run.run(adapters, scenarios=scenarios)

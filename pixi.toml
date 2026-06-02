@@ -15,6 +15,20 @@ test = "pytest"
 lint = "ruff check ."
 format = "ruff format ."
 
+# Pin the BLAS / OpenMP thread pools to one thread each. This must be set before
+# numpy is imported, so it lives in the environment rather than in code. On NAC
+# (256 logical cores, strict memory overcommit) an unpinned numpy reserves a
+# per-core arena that balloons each process's virtual size into the tens of GB;
+# the SCM worker pools then fail to fork (OSError: Cannot allocate memory).
+# One BLAS thread per worker keeps the virtual footprint small; parallelism
+# comes from the worker processes (see DEFAULT_MAX_WORKERS), not BLAS threads.
+[activation.env]
+OMP_NUM_THREADS = "1"
+OPENBLAS_NUM_THREADS = "1"
+MKL_NUM_THREADS = "1"
+NUMEXPR_NUM_THREADS = "1"
+VECLIB_MAXIMUM_THREADS = "1"
+
 # Scientific base from conda-forge.
 [dependencies]
 python = "3.11.*"
