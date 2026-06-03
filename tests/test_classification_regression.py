@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import pytest
 
+from ar7_ch5.classification import GW_ORDER, classify_warming
 from ar7_ch5.feasibility import apply_feasibility, apply_sustainability
 from ar7_ch5.load import load_sci_iamc_global
 from ar7_ch5.runners import repo_root
@@ -82,3 +83,32 @@ def test_benchmark_intersection(vetting, vetted_df):
         & (combined["worst_sustainability"] != "major")
     ]
     assert len(benchmark) == 55
+
+
+@pytest.fixture(scope="module")
+def warming(sci_df):
+    return classify_warming(sci_df)
+
+
+def test_classification_counts(warming):
+    """GW main-category distribution over the full 1599-scenario ensemble."""
+    counts = warming["category"].value_counts().reindex(GW_ORDER).dropna().astype(int).to_dict()
+    assert counts == {
+        "GW0": 15, "GW1": 128, "GW2": 249, "GW3": 365, "GW4": 192,
+        "GW5": 244, "GW6": 122, "GW7": 109, "GW8": 117, "unclassified": 58,
+    }
+
+
+def test_vetted_classification_counts(vetting, warming):
+    """Category counts restricted to scenarios that passed vetting."""
+    combined = vetting.merge(warming, on=["Model", "Scenario"])
+    vetted = combined.loc[combined["vetting_status"] == "passed"]
+    counts = {
+        cat: int((vetted["category"] == cat).sum())
+        for cat in GW_ORDER
+        if (vetted["category"] == cat).sum() > 0
+    }
+    assert counts == {
+        "GW1": 7, "GW2": 25, "GW3": 67, "GW4": 42,
+        "GW5": 59, "GW6": 43, "GW7": 42, "GW8": 45,
+    }
