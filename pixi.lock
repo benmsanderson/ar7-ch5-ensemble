@@ -721,7 +721,7 @@ packages:
 - pypi: ./
   name: ar7-ch5
   version: 0.1.0
-  sha256: 7c5aef131305441b95f0093b3feb9fc6cf256fac998780c6d034d022a6c4554e
+  sha256: 39dfbecf1dfb372599eb28ce923b1c725f84e2e80405bd83ebd8d558e7734534
   requires_dist:
   - numpy
   - pandas>=2.2
