@@ -1,4 +1,4 @@
-"""CICERO-SCM 2.1.1 run wrapper.
+"""CICERO-SCM 2.1.2 run wrapper.
 
 Builds a configured ``CICEROSCMPY2`` adapter from the native CICERO calibration
 distribution (Zenodo 20506399, Marit Sandstad's RCMIP-III 500-member set) via
@@ -26,7 +26,7 @@ def build_ciceroscmpy2(
     mode: RunMode = RunMode.EMISSIONS_DRIVEN,
     max_workers: int | None = None,
 ) -> CICEROSCMPY2:
-    """Configure CICERO-SCM 2.1.1 from the native calibration distribution.
+    """Configure CICERO-SCM 2.1.2 from the native calibration distribution.
 
     Parameters
     ----------
