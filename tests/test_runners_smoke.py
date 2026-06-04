@@ -16,7 +16,9 @@ from __future__ import annotations
 import os
 
 import pytest
+import scmdata
 
+from ar7_ch5.experiments.sci_ensemble import run_sci_batch
 from ar7_ch5.load import available_sci_scenarios, load_sci_infilled
 from ar7_ch5.runners import (
     repo_root,
@@ -77,3 +79,47 @@ def test_single_model_gsat_sane(model, sci_scenario):
     assert ((values > 0.0) & (values < 7.0)).all(), (
         f"{model} 2100 GSAT out of sane band: {values}"
     )
+
+
+@pytest.mark.smoke
+def test_sci_batch_writes_resumable_netcdf(tmp_path):
+    """The chunked batch writer lands one NetCDF per (pathway, model) and resumes.
+
+    FaIR-only (no MAGICC binary needed) on two pathways, two members each.
+    """
+    if not SCI_XLSX.is_file():
+        pytest.skip("SCI xlsx not available (see docs/data_setup.md)")
+    if not _MODEL_AVAILABLE["fair"]():
+        pytest.skip("fair assets unavailable")
+
+    out_dir = tmp_path / "sci"
+    first = run_sci_batch(
+        SCI_XLSX,
+        ["fair"],
+        n_members=2,
+        output_dir=out_dir,
+        limit=2,
+    )
+    assert len(first) == 2
+    assert all(r.status == "written" for r in first), first
+
+    files = sorted((out_dir / "fair").glob("*.nc"))
+    assert len(files) == 2, f"expected 2 NetCDF files, got {files}"
+    assert (out_dir / "manifest.csv").is_file()
+
+    reloaded = scmdata.ScmRun.from_nc(str(files[0]))
+    gsat = reloaded.filter(
+        variable="Surface Air Temperature Change", region="World", year=2100
+    ).values.ravel()
+    assert gsat.size == 2, f"expected 2 members, got {gsat.size}"
+    assert ((gsat > 0.0) & (gsat < 7.0)).all(), f"GSAT out of band: {gsat}"
+
+    # Re-running with the files in place skips them (resumable).
+    second = run_sci_batch(
+        SCI_XLSX,
+        ["fair"],
+        n_members=2,
+        output_dir=out_dir,
+        limit=2,
+    )
+    assert all(r.status == "skipped" for r in second), second
