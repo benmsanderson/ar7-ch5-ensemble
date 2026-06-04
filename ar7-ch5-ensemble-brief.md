@@ -10,7 +10,7 @@ lists the open decisions to settle in the first session.
 A user-facing application repository for the climate-model runs and
 emissions-based scenario assessment underpinning IPCC AR7 WG1 Chapter 5
 (Ben Sanderson, lead author). It runs three simple climate models (FaIR 2.x,
-CICERO-SCM v2.1.1, MAGICC) across:
+CICERO-SCM v2.1.2, MAGICC) across:
 
 1. The Scenario Compass Initiative 2025 v1.0 ensemble (~1600 IAMC pathways,
    5-yearly to 2100, Huppmann et al. 2026, Zenodo 18598251).
@@ -54,7 +54,7 @@ Concretely:
 |--------------|-----------------------------------------------|-----------------------------------------------------------------------|
 | SCM engine     | openscm-runner (modernised fork)              | github.com/benmsanderson/openscm-runner, branch `feat/fair2-ciceroscmpy2-adapters-and-runmode` until upstream PRs land |
 | FaIR 2.x       | fair >=2.2.4                                  | Calibration zenodo.org/records/18828694                               |
-| CICERO-SCM     | ciceroscm 2.1.1                               | github.com/ciceroOslo/ciceroscm; calibration zenodo.org/records/20506399 |
+| CICERO-SCM     | ciceroscm 2.1.2                               | github.com/ciceroOslo/ciceroscm; calibration zenodo.org/records/20506399 |
 | MAGICC         | pymagicc + licensed MAGICC v7.5.3 binary      | gitlab.com/magicc/magicc; AR6 600-member drawnset                     |
 | Post-processing| gcages.ar6.post_processing (no [ar6] extra)   | github.com/openscm/gcages; supplies AR6 anchoring + quantile machinery |
 | Scenario IO    | pyam, scmdata                                 | IIASA pyam, ORD scmdata (scmdata stays for v1; see roadmap memory)    |
