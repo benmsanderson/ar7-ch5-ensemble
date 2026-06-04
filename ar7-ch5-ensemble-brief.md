@@ -1,6 +1,6 @@
 # Brief: AR7 WG1 Chapter 5 climate runs repository
 
-A handover document for a fresh Claude Code session starting work on the AR7
+Workplan for code development of an AR7
 WG1 Chapter 5 climate-runs application repository. This brief sets project
 context, names the dependencies and source material, proposes a layout, and
 lists the open decisions to settle in the first session.
