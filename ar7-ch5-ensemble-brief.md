@@ -10,7 +10,7 @@ lists the open decisions to settle in the first session.
 A user-facing application repository for the climate-model runs and
 emissions-based scenario assessment underpinning IPCC AR7 WG1 Chapter 5
 (Ben Sanderson, lead author). It runs three simple climate models (FaIR 2.x,
-CICERO-SCM v2.1.0, MAGICC) across:
+CICERO-SCM v2.1.2, MAGICC) across:
 
 1. The Scenario Compass Initiative 2025 v1.0 ensemble (~1600 IAMC pathways,
    5-yearly to 2100, Huppmann et al. 2026, Zenodo 18598251).
@@ -51,7 +51,7 @@ Concretely:
 |--------------|-----------------------------------------------|-----------------------------------------------------------------------|
 | SCM engine   | openscm-runner (modernised fork)              | github.com/benmsanderson/openscm-runner, branch `modernisation/integration` until upstream PRs land |
 | FaIR 2.x     | fair >=2.2.4                                  | Calibration zenodo.org/records/18828694                               |
-| CICERO-SCM   | ciceroscm 2.1.0                               | github.com/ciceroOslo/ciceroscm                                       |
+| CICERO-SCM   | ciceroscm 2.1.2                               | github.com/ciceroOslo/ciceroscm                                       |
 | MAGICC       | pymagicc (current) or open-source MAGICC      | gitlab.com/magicc/magicc                                              |
 | Scenario IO  | pyam, scmdata                                 | IIASA pyam, ORD scmdata (scmdata stays for v1; see roadmap memory)    |
 | Env mgmt     | Pixi                                          | Matches Charlie Koven's ar7_wg1_ch5 convention so authors only learn one tool |
@@ -144,7 +144,7 @@ ar7-ch5-ensemble/
     runners/
       __init__.py
       fair.py                   FaIR 2.x configuration + run wrapper
-      ciceroscm.py              CICERO-SCM 2.1.0 configuration + run wrapper
+      ciceroscm.py              CICERO-SCM 2.1.2 configuration + run wrapper
       magicc.py                 MAGICC configuration + run wrapper
       orchestrate.py            builds (scenario, model, config_chunk) plan, dispatches via openscm-runner
     experiments/
@@ -207,7 +207,7 @@ being readable by future Ch5 authors.
 1. **Scaffold.** Empty layout above, pixi env, CI skeleton, README that
    explains the plan. Pin the openscm-runner fork.
 2. **Single-scenario smoke test.** One SCI scenario end-to-end through FaIR
-   2.x, CICERO-SCM 2.1.0, MAGICC, on a laptop. Validates the openscm-runner
+   2.x, CICERO-SCM 2.1.2, MAGICC, on a laptop. Validates the openscm-runner
    fork integration before anything harder.
 3. **Port classification.** Vetting, feasibility, classification modules
    from scenariocompass, with tests that regress against scenariocompass

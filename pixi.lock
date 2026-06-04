@@ -294,7 +294,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/1e/d3/26bf1008eb3d2daa8ef4cacc7f3bfdc11818d111f7e2d0201bc6e3b49d45/annotated_doc-0.0.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/78/b6/6307fbef88d9b5ee7421e68d78a9f162e0da4900bc5f5793f6d3d0e34fb8/annotated_types-0.7.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b2/71/4d1d479aa56d0101c40e17720c3d6ac2af7269ea0487a80b18e7bfd1a5b7/ast_serialize-0.5.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
-      - pypi: https://files.pythonhosted.org/packages/0a/35/2a5ceb690fd109519692aacdec96b9d562a9eadafc89c2c591c4936ad21b/ciceroscm-2.1.1-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/9e/93/589082cef28de36ec46712607fa047dd827bf3b5ad88e356bf697d71301d/ciceroscm-2.1.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/c7/0d/67e5b4109ea4a837e80daa87c2c696711955e40449a97e8926672534def2/click-8.4.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a9/ee/39fc4b67a7ae5ba91d6da18a1b66cbdf6b2f4f88e3a26ca36823f3482dd3/f90nml-1.5-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/0d/b0/b58d9e65796a6eb7025bb70a162b40b3d19bcd35a7b2a4ce6704aa3f8459/fair-2.2.4-py3-none-any.whl
@@ -570,7 +570,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/1e/d3/26bf1008eb3d2daa8ef4cacc7f3bfdc11818d111f7e2d0201bc6e3b49d45/annotated_doc-0.0.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/78/b6/6307fbef88d9b5ee7421e68d78a9f162e0da4900bc5f5793f6d3d0e34fb8/annotated_types-0.7.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/26/0a/bd3d18a582f273d6c843d16bb9e22e9e16365ff7991e92f18f798e9f1224/ast_serialize-0.5.0-cp39-abi3-macosx_11_0_arm64.whl
-      - pypi: https://files.pythonhosted.org/packages/0a/35/2a5ceb690fd109519692aacdec96b9d562a9eadafc89c2c591c4936ad21b/ciceroscm-2.1.1-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/9e/93/589082cef28de36ec46712607fa047dd827bf3b5ad88e356bf697d71301d/ciceroscm-2.1.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/c7/0d/67e5b4109ea4a837e80daa87c2c696711955e40449a97e8926672534def2/click-8.4.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a9/ee/39fc4b67a7ae5ba91d6da18a1b66cbdf6b2f4f88e3a26ca36823f3482dd3/f90nml-1.5-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/0d/b0/b58d9e65796a6eb7025bb70a162b40b3d19bcd35a7b2a4ce6704aa3f8459/fair-2.2.4-py3-none-any.whl
@@ -1457,10 +1457,10 @@ packages:
   - pkg:pypi/charset-normalizer?source=hash-mapping
   size: 58872
   timestamp: 1775127203018
-- pypi: https://files.pythonhosted.org/packages/0a/35/2a5ceb690fd109519692aacdec96b9d562a9eadafc89c2c591c4936ad21b/ciceroscm-2.1.1-py3-none-any.whl
+- pypi: https://files.pythonhosted.org/packages/9e/93/589082cef28de36ec46712607fa047dd827bf3b5ad88e356bf697d71301d/ciceroscm-2.1.2-py3-none-any.whl
   name: ciceroscm
-  version: 2.1.1
-  sha256: bc868a769297c4a25260c0edaa4dc5023fe8574d606d6f8e2df5b69a01db20cb
+  version: 2.1.2
+  sha256: 03ec3c7f359ebb8f97cefb636d5c87bf1fd242ed1c1ec8f76dba01122d56feda
   requires_dist:
   - click
   - python-dotenv

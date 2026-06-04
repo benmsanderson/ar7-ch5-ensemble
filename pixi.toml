@@ -52,7 +52,7 @@ pip = "*"
 ar7-ch5 = { path = ".", editable = true }
 openscm-runner = { git = "https://github.com/benmsanderson/openscm-runner.git", branch = "feat/fair2-ciceroscmpy2-adapters-and-runmode" }
 fair = ">=2.2.4"
-ciceroscm = "==2.1.1"
+ciceroscm = "==2.1.2"
 pymagicc = "*"
 pyam-iamc = "*"
 scmdata = "*"

@@ -1,6 +1,6 @@
 """Real-SCM smoke tests: one SCI pathway, two members, per model.
 
-These hit the actual FaIR 2.x / CICERO-SCM 2.1.1 / MAGICC adapters (no mocking)
+These hit the actual FaIR 2.x / CICERO-SCM 2.1.2 / MAGICC adapters (no mocking)
 on a tiny ensemble and assert the 2100 GSAT lands in a physically sane band.
 They are marked ``smoke`` and skip when the required assets are absent (the
 calibration sets, the SCI xlsx, and for MAGICC the licensed binary), so a bare

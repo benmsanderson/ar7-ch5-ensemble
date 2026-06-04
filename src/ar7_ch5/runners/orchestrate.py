@@ -1,7 +1,7 @@
 """Adapter assembly and dispatch.
 
 ``run_models`` builds the requested per-model AdapterLike objects (FaIR 2.x,
-CICERO-SCM 2.1.1, MAGICC v7.5.3) and dispatches them through
+CICERO-SCM 2.1.2, MAGICC v7.5.3) and dispatches them through
 ``openscm_runner.run.run`` in a single call. The new engine API accepts a list
 of pre-constructed adapters (each carrying its own cfgs and output_variables),
 so all three models run against one scenarios ScmRun.
