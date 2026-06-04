@@ -31,6 +31,7 @@ from ar7_ch5.classification import (
 )
 from ar7_ch5.feasibility import apply_feasibility, apply_sustainability
 from ar7_ch5.load import load_sci_iamc_global
+from ar7_ch5.metrics import warming_metrics_from_outputs
 from ar7_ch5.runners import repo_root
 from ar7_ch5.vetting import apply_vetting
 
@@ -125,8 +126,6 @@ def _classify_from_xlsx(df: pd.DataFrame) -> pd.DataFrame:
 
 def _classify_from_metrics(df: pd.DataFrame, args) -> pd.DataFrame:
     """Vetting + feasibility + sustainability + classification (NC path)."""
-    from ar7_ch5.metrics import warming_metrics_from_outputs
-
     pairs = list(
         df[["Model", "Scenario"]].drop_duplicates().itertuples(index=False, name=None)
     )
@@ -149,6 +148,15 @@ def _classify_from_metrics(df: pd.DataFrame, args) -> pd.DataFrame:
 
     cc = warming["category"].value_counts().reindex(GW_ORDER).dropna().astype(int).to_dict()
     print(f"  classification ({args.source}): {cc}")
+    # Per-SCM breakdown surfaces the cross-model spread that the emissions-based
+    # path is meant to expose; the headline `source` choice is a CLI flag, not
+    # a hidden default, so this is the validation-earlier check on it.
+    if args.source == "per_model" and "climate_model" in warming.columns:
+        for cm, sub in warming.groupby("climate_model", observed=True):
+            sub_cc = (
+                sub["category"].value_counts().reindex(GW_ORDER).dropna().astype(int).to_dict()
+            )
+            print(f"    {cm}: {sub_cc}")
 
     vetted_pairs = vetting.loc[
         vetting["vetting_status"] == "passed", ["Model", "Scenario"]

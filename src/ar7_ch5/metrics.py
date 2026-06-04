@@ -28,6 +28,11 @@ from typing import Literal
 
 import pandas as pd
 import scmdata
+from gcages.ar6.post_processing import get_temperatures_in_line_with_assessment
+from pandas_openscm.grouping import (
+    fix_index_name_after_groupby_quantile,
+    groupby_except,
+)
 
 GSAT_VARIABLE = "Surface Air Temperature Change"
 
@@ -85,10 +90,12 @@ def load_pathway_outputs(
     """
     out_dir = Path(outputs_dir)
     pieces: list[pd.DataFrame] = []
+    missing: list[tuple[str, str, str]] = []
     for iam, scenario in pathways:
         for scm in models:
             path = out_dir / scm / pathway_nc_name(iam, scenario)
             if not path.is_file():
+                missing.append((scm, iam, scenario))
                 continue
             run = scmdata.ScmRun.from_nc(path)
             run = run.filter(variable=variable, region=region)
@@ -107,6 +114,14 @@ def load_pathway_outputs(
     if not pieces:
         raise FileNotFoundError(
             f"No SCM output NetCDFs found under {out_dir} for {list(pathways)}."
+        )
+    if missing:
+        # Don't crash if a single SCM is missing for some pathways: the
+        # combination just runs over fewer members. But warn so the user
+        # knows the ensemble has shrunk for those pathways.
+        print(
+            f"NOTE: skipped {len(missing)} missing per-(scm, pathway) NetCDFs "
+            f"under {out_dir} (first 3: {missing[:3]})."
         )
     return pd.concat(pieces)
 
@@ -139,8 +154,6 @@ def anchor_to_assessment(
     :func:`gcages.ar6.post_processing.get_temperatures_in_line_with_assessment`
     with the AR6 defaults.
     """
-    from gcages.ar6.post_processing import get_temperatures_in_line_with_assessment
-
     return get_temperatures_in_line_with_assessment(
         raw_temperatures,
         assessment_median=assessment_median,
@@ -187,11 +200,6 @@ def compute_warming_metrics(
     ``peak_warming_50``, ``peak_warming_67``), plus ``declining`` (median
     2100 < median 2090; None if either is missing).
     """
-    from pandas_openscm.grouping import (
-        fix_index_name_after_groupby_quantile,
-        groupby_except,
-    )
-
     quantiles = tuple(quantiles)
     if 0.5 not in quantiles or 0.67 not in quantiles:
         raise ValueError(
