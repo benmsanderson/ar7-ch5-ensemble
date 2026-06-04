@@ -44,6 +44,7 @@ Concretely:
   the actual run logic.
 - Configuration in plain YAML or TOML files, not buried in code.
 - Errors that say what to do, not just what went wrong.
+- Do not bullet-proof things, if a setup is trying to run with unexpected or wrong inputs better to catch the error, raise an exception or even crash cleanly, than muddle through with try-except bootstrapping.
 
 ## 3. Stack
 
@@ -55,6 +56,8 @@ Concretely:
 | MAGICC       | pymagicc (current) or open-source MAGICC      | gitlab.com/magicc/magicc                                              |
 | Scenario IO  | pyam, scmdata                                 | IIASA pyam, ORD scmdata (scmdata stays for v1; see roadmap memory)    |
 | Env mgmt     | Pixi                                          | Matches Charlie Koven's ar7_wg1_ch5 convention so authors only learn one tool |
+
+Won't openscm-runner take care of fair, ciceroscm and magicc?
 
 ## 4. Source material to port from `scenariocompass`
 
@@ -111,11 +114,13 @@ modules.
 
 - **IIASA `climate-assessment`** (github.com/iiasa/climate-assessment). The
   AR6 WGIII pipeline that calls openscm-runner in anger. Read to see how the
-  runner is actually used downstream.
+  runner is actually used downstream. In anger?
 
 - **Marit Sandstad's `cscm-input-data-generation`**
   (github.com/ciceroOslo/cscm-input-data-generation). CICERO-SCM scenario
   ingestion patterns.
+
+  - Also emissions-harmonisation-repo?
 
 ## 6. Proposed layout
 
@@ -179,6 +184,10 @@ ar7-ch5-ensemble/
     test_runners_smoke.py       each SCM produces sane output on one scenario
     test_harmonise.py           regression vs Charlie's SSP2-COM outputs
 ```
+Add also .github with actions and workflows that can at least run the test-suite?
+Notebooks should be jupytext and only script-versions tracked?
+
+Looks like this is circumventing openscm-runner? Also, maybe you would want a capped version of the rcmip protocol files?
 
 ## 7. Workhorse machine
 
@@ -198,6 +207,10 @@ Implications:
   but document the assumption.
 - NUMA-awareness is not worth chasing for v1; revisit if profiling shows
   it matters.
+- NAC does not have slurm queuing.
+- Running should never be near to using the full memory
+- Chunking per model and scenario / group of scenarios and producing outputs in a loop makes sense question is if you delegate the organisation of that to openscm-runner (which possibly redelegates in trun)
+- Presumably you want people to be able to run on other machines (maybe even laptops), so maybe the focus should instead be on gauging the current machine and adjusting chunking and number of workers accordingly
 
 ## 8. First milestones
 
@@ -224,6 +237,8 @@ being readable by future Ch5 authors.
 8. **Figures.** Notebook-driven figure generation for Ch5 ZOD targets,
    cross-referenced against Charlie Koven's ZOD figures.
 
+   Some validation plots and checks should possibly happen / be included earlier than step 8 to check that correct / expected forcings are being applied?
+
 ## 9. Conventions
 
 - **No em-dashes.** Use plain commas, semicolons, parentheses, or sentence
@@ -246,6 +261,17 @@ being readable by future Ch5 authors.
   styles, and scenario naming from `scenariomip-paper-plots` so Ch5 figures
   read consistently with the GMD paper. Lift a shared style module rather
   than re-eyeballing colours.
+- **Code maintainability and readibility** Attempt to reuse code and use functions
+  where possible. This includes if imported libraries have functionality that can
+  be leveraged rather than reimplementing. Follow style guides and conventions
+  on linting and docs. Some problems may be better solved upstream in ciceroscm or
+  openscm-runner, if that might be the case flag and suggest for discussion.
+  Keep a tidy and tight software-stack where possible, so try to use mostly standard
+  libraries to avoid too much maintenance and deprecation burden down the line.
+  Try to avoid in-class or in-function imports and in-function sub-functions unless they lead to real
+  performance improvements or memory alleviations. Do not use classes unless
+  they come with real value added (i.e. avoid test structures where classes are
+  used as a sort of paragraph signifier with no real use of self)
 
 ## 10. Context the agent should load
 
@@ -284,3 +310,11 @@ session should ask the user before proceeding.
    harmonisation utility live: inside this repo (and Charlie imports from
    it), inside Charlie's repo (and this one imports), or a small standalone
    package both depend on?
+
+1. I like pixi
+2. NAC is raw shared-login, but setup should probably be a bit more machine-agnostic?
+3. I think we need a setup step for MAGICC, (even if openscm-runner is in charge of
+   running MAGICC).
+4. I think having a path / setting a path and possibly ingest from Zenodo if missing is
+   the way to go for this.
+6. 
