@@ -10,7 +10,7 @@ lists the open decisions to settle in the first session.
 A user-facing application repository for the climate-model runs and
 emissions-based scenario assessment underpinning IPCC AR7 WG1 Chapter 5
 (Ben Sanderson, lead author). It runs three simple climate models (FaIR 2.x,
-CICERO-SCM v2.1.0, MAGICC) across:
+CICERO-SCM v2.1.1, MAGICC) across:
 
 1. The Scenario Compass Initiative 2025 v1.0 ensemble (~1600 IAMC pathways,
    5-yearly to 2100, Huppmann et al. 2026, Zenodo 18598251).
@@ -44,17 +44,31 @@ Concretely:
   the actual run logic.
 - Configuration in plain YAML or TOML files, not buried in code.
 - Errors that say what to do, not just what went wrong.
+- Do not bullet-proof. If a setup is running with unexpected or wrong
+  inputs, raise a clear exception or crash cleanly rather than muddling
+  through with try/except bootstrapping.
 
 ## 3. Stack
 
 | Layer        | What                                          | Source                                                                |
 |--------------|-----------------------------------------------|-----------------------------------------------------------------------|
-| SCM engine   | openscm-runner (modernised fork)              | github.com/benmsanderson/openscm-runner, branch `modernisation/integration` until upstream PRs land |
-| FaIR 2.x     | fair >=2.2.4                                  | Calibration zenodo.org/records/18828694                               |
-| CICERO-SCM   | ciceroscm 2.1.0                               | github.com/ciceroOslo/ciceroscm                                       |
-| MAGICC       | pymagicc (current) or open-source MAGICC      | gitlab.com/magicc/magicc                                              |
-| Scenario IO  | pyam, scmdata                                 | IIASA pyam, ORD scmdata (scmdata stays for v1; see roadmap memory)    |
-| Env mgmt     | Pixi                                          | Matches Charlie Koven's ar7_wg1_ch5 convention so authors only learn one tool |
+| SCM engine     | openscm-runner (modernised fork)              | github.com/benmsanderson/openscm-runner, branch `feat/fair2-ciceroscmpy2-adapters-and-runmode` until upstream PRs land |
+| FaIR 2.x       | fair >=2.2.4                                  | Calibration zenodo.org/records/18828694                               |
+| CICERO-SCM     | ciceroscm 2.1.1                               | github.com/ciceroOslo/ciceroscm; calibration zenodo.org/records/20506399 |
+| MAGICC         | pymagicc + licensed MAGICC v7.5.3 binary      | gitlab.com/magicc/magicc; AR6 600-member drawnset                     |
+| Post-processing| gcages.ar6.post_processing (no [ar6] extra)   | github.com/openscm/gcages; supplies AR6 anchoring + quantile machinery |
+| Scenario IO    | pyam, scmdata                                 | IIASA pyam, ORD scmdata (scmdata stays for v1; see roadmap memory)    |
+| Env mgmt       | Pixi                                          | Matches Charlie Koven's ar7_wg1_ch5 convention so authors only learn one tool |
+
+**Separation of concerns with the engine.** openscm-runner is the runner: it
+owns the FaIR, CICERO-SCM and MAGICC adapters and the (member, scenario) ->
+output mapping. This repository drives: it selects experiments, derives any
+inputs that aren't shipped with the source (e.g. irrigation forcing and
+land-use albedo, both calculable from `CO2|AFOLU` and the chosen SSP), names
+the variables it wants back, and post-processes the result into figures and
+the classification. If an SCM does not produce a requested variable, the fix
+is upstream (in the SCM or in the runner's adapter); this repo should record
+the gap and continue, not crash.
 
 ## 4. Source material to port from `scenariocompass`
 
@@ -110,8 +124,24 @@ modules.
   the GMD paper.
 
 - **IIASA `climate-assessment`** (github.com/iiasa/climate-assessment). The
-  AR6 WGIII pipeline that calls openscm-runner in anger. Read to see how the
-  runner is actually used downstream.
+  AR6 WGIII pipeline that runs openscm-runner in production. Read to see how
+  the runner is actually used downstream.
+
+- **Zebedee Nicholls' `openscm/gcages`**
+  (github.com/openscm/gcages). The AR6 successor to climate-assessment:
+  harmonisation, infilling, SCM running, post-processing. This repo depends
+  on it (no `[ar6]` extra, so aneris / silicone / pymagicc are not pulled
+  in); only `gcages.ar6.post_processing` is consumed, which supplies the AR6
+  historical anchoring, peak/EOC warming, quantile aggregation and
+  exceedance probabilities used by the emissions-based classification path.
+  The multi-SCM combination logic we add on top (per-model / pooled / per-
+  model-classify-then-aggregate) is a candidate to push upstream eventually.
+
+- **`emissions-harmonisation-historical`**
+  (github.com/iiasa/emissions_harmonization_historical, on NAC at
+  `/storage/no-backup-nac/users/bensan/emissions_harmonization_historical`).
+  Source of the 52-species World 1750-2023 history anchor used by the light
+  SSP2-COM harmoniser.
 
 - **Marit Sandstad's `cscm-input-data-generation`**
   (github.com/ciceroOslo/cscm-input-data-generation). CICERO-SCM scenario
@@ -178,6 +208,8 @@ ar7-ch5-ensemble/
     test_classification.py
     test_runners_smoke.py       each SCM produces sane output on one scenario
     test_harmonise.py           regression vs Charlie's SSP2-COM outputs
+  .github/
+    workflows/                  CI: pytest + ruff on PRs (still to set up)
 ```
 
 ## 7. Workhorse machine
@@ -193,11 +225,21 @@ Implications:
   streaming / chunked output writer is still wanted because the SCI x
   3-SCM x N-config product is large and accumulating everything in scmdata
   RAM is wasteful.
-- Respect `OMP_NUM_THREADS` and `SLURM_CPUS_PER_TASK` if NAC uses SLURM
-  queueing (to confirm; see decision 3). Otherwise `os.cpu_count()` is fine
-  but document the assumption.
+- NAC is raw shared-login, no SLURM queueing; the worker pool sizes from
+  `os.cpu_count()` with a polite cap (12 workers by default). Pin BLAS
+  threads to 1 in the environment so the per-process virtual size stays
+  small and `fork()` stays within the headroom on the strict-overcommit
+  kernel; see `docs/running_on_nac.md` for the trap and the mitigation.
 - NUMA-awareness is not worth chasing for v1; revisit if profiling shows
   it matters.
+
+**Machine-agnostic by default, NAC-tuned in docs.** Authors will run this
+on laptops, on other shared-login nodes, and possibly on queueable clusters.
+The code gauges available cores and memory at launch and adjusts worker
+count and chunking accordingly, rather than hardcoding NAC numbers. NAC-
+specific guidance (memory-overcommit trap, expected throughput, the
+worker-cap default, monitoring patterns) lives in `docs/running_on_nac.md`,
+not in the code.
 
 ## 8. First milestones
 
@@ -218,11 +260,20 @@ being readable by future Ch5 authors.
    three-SCM ensemble. Extract shared harmonisation utility, validate
    against Charlie Koven's FaIR-only SSP2-COM output.
 6. **ScenarioMIP CMIP7 baseline runs.** Same machinery, different input set.
-7. **RCMIP3 idealised experiments.** Requires openscm-runner
-   concentration-driven support (engine priority #4). May land after the
-   SCI work.
+7. **RCMIP3 idealised experiments.** A capped subset of the RCMIP-III
+   protocol (just the experiments Ch5 reports: concentration-driven,
+   fixed-forcing, abrupt-CO2); not the full protocol. Requires
+   concentration-driven support across the three SCM adapters in the
+   openscm-runner fork (FaIR and CICERO-SCM already declare it; MAGICC
+   does not yet, see engine roadmap). May land after the SCI work.
 8. **Figures.** Notebook-driven figure generation for Ch5 ZOD targets,
    cross-referenced against Charlie Koven's ZOD figures.
+
+**Validation plots and sanity checks land with the milestone that introduces
+the data, not gated by milestone 8.** A new pipeline stage should print or
+write the simplest diagnostic that lets a reader verify "this looks right"
+without re-running the whole batch. M3's per-SCM GW breakdown in
+`classify.py --source per_model` is one example.
 
 ## 9. Conventions
 
@@ -246,6 +297,20 @@ being readable by future Ch5 authors.
   styles, and scenario naming from `scenariomip-paper-plots` so Ch5 figures
   read consistently with the GMD paper. Lift a shared style module rather
   than re-eyeballing colours.
+- **Code maintainability and readability.** Reuse a library's built-in
+  functionality before reimplementing it. Follow the linting and docs
+  style (`ruff`, brief docstrings). Some problems are better solved
+  upstream in the SCM or in openscm-runner; if you suspect that, flag and
+  suggest a discussion rather than working around it here. Keep the
+  software stack tight; prefer well-maintained standard libraries to
+  reduce maintenance and deprecation burden.
+- **No in-function imports or in-function sub-functions** unless they
+  give a real performance or memory win. Do not use classes unless they
+  carry state worth encapsulating: no class-as-paragraph-marker, no test
+  classes that don't use `self`.
+- **Notebooks tracked as jupytext-paired scripts.** The committed
+  artefact is the `.py` percent-format script; the `.ipynb` is generated
+  on demand. Keeps diffs reviewable.
 
 ## 10. Context the agent should load
 
@@ -265,22 +330,47 @@ A new project memory should be written at first-session start naming this
 repo as the AR7 Ch5 application repo and pointing back to the openscm-runner
 fork as the engine.
 
-## 11. Open decisions for the first session
+## 11. Decisions log
 
-These were not settled before this brief was written. The fresh Claude Code
-session should ask the user before proceeding.
+### Resolved
 
-1. **Env management.** Brief assumes Pixi (matches Charlie). Confirm before
-   committing `pixi.toml`.
-2. **NAC job scheduling.** Is NAC raw shared-login, or does it have SLURM
-   queueing? Affects `runners/orchestrate.py` worker-count logic.
-3. **MAGICC binary on NAC.** scenariocompass has a `magicc/` directory for
-   the binary. Is the license and binary already on NAC, or is that a setup
-   step?
-4. **Input data location on NAC.** Are SCI xlsx files and ScenarioMIP CMIP7
-   inputs already staged on NAC, or do we ingest them from Zenodo on first
-   run?
-5. **Shared harmonisation host.** Where does the shared SSP2-COM
-   harmonisation utility live: inside this repo (and Charlie imports from
-   it), inside Charlie's repo (and this one imports), or a small standalone
-   package both depend on?
+1. **Env management:** Pixi. Committed in `pixi.toml`; matches Charlie's
+   `ar7_wg1_ch5`.
+2. **NAC job scheduling:** raw shared-login, no SLURM. See
+   `docs/running_on_nac.md` for the worker-cap and memory-overcommit
+   discussion.
+3. **MAGICC binary on NAC:** staged at
+   `/storage/no-backup-nac/users/bensan/magicc-dist/`, with the AR6
+   probabilistic drawnset alongside. The path is set via
+   `MAGICC_EXECUTABLE_7` and resolved by the runner; the drawnset path
+   has a similar override (`MAGICC_PROBABILISTIC_FILE`). See
+   `docs/data_setup.md`. MAGICC setup is an explicit step (license,
+   binary, drawnset), not an automatic fetch.
+4. **Input data location:** mixed, per `docs/data_setup.md`. The SCI
+   xlsx is manually placed under `data/SCI/` (access-restricted, no
+   programmatic fetch). The FaIR and CICERO-SCM calibration sets,
+   ScenarioMIP CMIP7 emissions, and the global history anchor use an
+   override-or-default pattern: a path environment variable points at a
+   staged location, defaulting to `data/`; a future `scripts/fetch_*.py`
+   helper pulls from Zenodo when missing.
+
+### Open
+
+5. **Shared harmonisation host.** Where the shared SSP2-COM
+   harmonisation utility lives: inside this repo (and Charlie imports
+   from it), inside Charlie's repo (and this one imports), or a small
+   standalone package both depend on. To settle when M5 starts.
+6. **Headline source for the emissions-based classification.** Whether
+   the chapter's main classification uses per-SCM percentiles with
+   MAGICC as headline (B1), pooled across the three SCMs (B2), or
+   per-SCM classify-then-aggregate-as-robust (B4). Infrastructure
+   exposes all of these as a CLI flag in `scripts/classify.py`
+   (`--source xlsx|per_model|pooled`); the choice can wait until the
+   full-ensemble comparison is on hand. See memory
+   `project_classification_warming_contract`.
+7. **CI workflow.** `.github/workflows/` for running at least `pytest`
+   and `ruff` on PRs is still to set up.
+8. **MAGICC concentration-driven adapter.** Required by milestone 7
+   (RCMIP3). FaIR and CICERO-SCM already declare it; MAGICC does not.
+   Decision deferred to when M7 starts: wire it in the engine fork
+   first, or ship M7 as a FaIR + CICERO ensemble and add MAGICC later.
