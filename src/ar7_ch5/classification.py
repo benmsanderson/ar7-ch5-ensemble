@@ -131,6 +131,49 @@ def classify_single(
     return ("GW8", "GW8")
 
 
+def classify_from_metrics(metrics: pd.DataFrame) -> pd.DataFrame:
+    """Apply :func:`classify_single` to a pre-computed warming-metrics frame.
+
+    The frame is the output of
+    :func:`ar7_ch5.metrics.compute_warming_metrics` (or
+    :func:`ar7_ch5.metrics.warming_metrics_from_outputs`): one row per scenario
+    group with columns ``peak_warming_50``, ``peak_warming_67``,
+    ``eoc_warming_50``, ``eoc_warming_67``, and ``declining``. This is the
+    emissions-based path of the classification (driven by our 3-SCM ensemble),
+    in contrast to :func:`classify_warming` which reads the MAGICC v7.5.3
+    percentiles baked into the SCI xlsx.
+
+    Returns the input frame plus ``category`` and ``subcategory`` columns.
+    """
+    required = {
+        "peak_warming_50", "peak_warming_67",
+        "eoc_warming_50", "eoc_warming_67",
+        "declining",
+    }
+    missing = required - set(metrics.columns)
+    if missing:
+        raise KeyError(
+            f"metrics frame missing required columns: {sorted(missing)}; "
+            f"got {list(metrics.columns)}."
+        )
+    out = metrics.copy()
+    cats: list[str] = []
+    subcats: list[str] = []
+    for _, row in out.iterrows():
+        cat, sub = classify_single(
+            row["peak_warming_50"],
+            row["eoc_warming_50"],
+            row["peak_warming_67"],
+            row["eoc_warming_67"],
+            row["declining"],
+        )
+        cats.append(cat)
+        subcats.append(sub)
+    out["category"] = cats
+    out["subcategory"] = subcats
+    return out
+
+
 def classify_warming(df: pd.DataFrame) -> pd.DataFrame:
     """Classify all scenarios in a global ensemble into GW warming categories.
 

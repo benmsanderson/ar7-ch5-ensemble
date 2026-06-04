@@ -20,6 +20,7 @@ dependencies = [
   "openpyxl",
   "pyam-iamc",
   "scmdata",
+  "gcages>=0.14,<0.15",
 ]
 
 [tool.hatch.build.targets.wheel]
