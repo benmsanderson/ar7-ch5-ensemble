@@ -296,3 +296,50 @@ def available_sci_scenarios(
         .itertuples(index=False, name=None)
     )
     return sorted(pairs)
+
+
+# IAMC convention year columns used by the classification pipeline (5-yearly
+# 2010-2100 inclusive, as strings to match scenariocompass).
+IAMC_YEAR_COLS = [str(y) for y in range(2010, 2105, 5)]
+
+
+def load_sci_iamc_global(
+    path: str | Path, *, region: str | None = "World", sheet: str = "data"
+) -> pd.DataFrame:
+    """Return the SCI wide IAMC frame the classification port consumes.
+
+    The classification modules (vetting, feasibility, classification) port from
+    scenariocompass, which expects the IAMC convention: Title-case meta columns
+    ``Model, Scenario, Region, Variable, Unit`` and *string* year headers
+    (``"2010"``, ``"2015"``, ...). :func:`load_sci_data_sheet` returns int
+    year columns for ScmRun compatibility, so this helper stringifies them
+    back and filters to ``region`` (the global file is ``World`` only).
+    """
+    df = load_sci_data_sheet(Path(path), sheet=sheet)
+    df.columns = [str(c) if isinstance(c, int) else c for c in df.columns]
+    if region is not None and "Region" in df.columns:
+        df = df.loc[df["Region"] == region].copy()
+    return df
+
+
+def get_variable(df: pd.DataFrame, variable: str) -> pd.DataFrame:
+    """Rows for ``variable`` with the ``Variable`` column dropped (tidy frame)."""
+    out = df.loc[df["Variable"] == variable].copy()
+    return out.drop(columns=["Variable"])
+
+
+def list_scenarios(df: pd.DataFrame) -> pd.DataFrame:
+    """Unique ``(Model, Scenario)`` pairs in ``df``."""
+    return df[["Model", "Scenario"]].drop_duplicates().reset_index(drop=True)
+
+
+def pivot_scenarios(df: pd.DataFrame, variable: str) -> pd.DataFrame:
+    """Wide ``(Model, Scenario)``-indexed frame for one variable.
+
+    Filters to ``variable``, keeps the year columns, sets ``(Model, Scenario)``
+    as the index, and coerces numeric so the result is ready for arithmetic.
+    """
+    rows = get_variable(df, variable)
+    year_cols = [c for c in rows.columns if isinstance(c, str) and c.isdigit()]
+    rows = rows.set_index(["Model", "Scenario"])[year_cols]
+    return rows.apply(pd.to_numeric, errors="coerce")

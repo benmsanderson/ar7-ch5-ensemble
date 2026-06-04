@@ -20,6 +20,7 @@ dependencies = [
   "openpyxl",
   "pyam-iamc",
   "scmdata",
+  "gcages>=0.14,<0.15",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -36,4 +37,5 @@ select = ["E", "F", "I", "W", "UP", "B"]
 testpaths = ["tests"]
 markers = [
   "smoke: real-SCM smoke tests (slow; need calibration sets and, for MAGICC, the licensed binary)",
+  "slow: end-to-end tests over the full SCI ensemble (need the SCI xlsx)",
 ]

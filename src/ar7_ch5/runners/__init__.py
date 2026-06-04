@@ -1,7 +1,7 @@
 """SCM run wrappers and orchestration.
 
 Thin, per-model builders around the openscm-runner engine (FaIR 2.x,
-CICERO-SCM 2.1.1, MAGICC v7.5.3). Each ``build_*`` returns a configured,
+CICERO-SCM 2.1.2, MAGICC v7.5.3). Each ``build_*`` returns a configured,
 AdapterLike object; ``orchestrate.run_models`` dispatches a list of them through
 ``openscm_runner.run.run``. No mocking of the SCMs: tests hit the real adapters
 on small inputs.

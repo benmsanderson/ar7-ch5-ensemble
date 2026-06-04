@@ -174,7 +174,7 @@ ar7-ch5-ensemble/
     runners/
       __init__.py
       fair.py                   FaIR 2.x configuration + run wrapper
-      ciceroscm.py              CICERO-SCM 2.1.0 configuration + run wrapper
+      ciceroscm.py              CICERO-SCM 2.1.2 configuration + run wrapper
       magicc.py                 MAGICC configuration + run wrapper
       orchestrate.py            builds (scenario, model, config_chunk) plan, dispatches via openscm-runner
     experiments/
@@ -249,7 +249,7 @@ being readable by future Ch5 authors.
 1. **Scaffold.** Empty layout above, pixi env, CI skeleton, README that
    explains the plan. Pin the openscm-runner fork.
 2. **Single-scenario smoke test.** One SCI scenario end-to-end through FaIR
-   2.x, CICERO-SCM 2.1.0, MAGICC, on a laptop. Validates the openscm-runner
+   2.x, CICERO-SCM 2.1.2, MAGICC, on a laptop. Validates the openscm-runner
    fork integration before anything harder.
 3. **Port classification.** Vetting, feasibility, classification modules
    from scenariocompass, with tests that regress against scenariocompass

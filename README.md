@@ -1,6 +1,6 @@
 # AR7 WG1 Chapter 5 climate runs
 
-Runs three simple climate models (FaIR 2.x, CICERO-SCM 2.1.0, MAGICC v7.5.3)
+Runs three simple climate models (FaIR 2.x, CICERO-SCM 2.1.2, MAGICC v7.5.3)
 across the Chapter 5 scenario sets and produces the emissions-based scenario
 classification, synthesis tables, and figures for IPCC AR7 WG1 Chapter 5.
 
