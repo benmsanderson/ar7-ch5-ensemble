@@ -4,19 +4,25 @@ A scope memo for the refactor that moves our pin from
 `benmsanderson/openscm-runner` (fork, branch
 `feat/fair2-ciceroscmpy2-adapters-and-runmode`) to
 `openscm/openscm-runner` (upstream, branch
-`feat/fair2-ciceroscmpy2-adapters-and-runmode-nonfork`).
+`feat/fair2-ciceroscmpy2-adapters-and-runmode-nonfork`). The upstream
+branch is 52 commits ahead of the fork and represents the design Zeb has
+settled on: strict canonical RCMIP3 scenario names. The chapter has to
+bridge.
 
-This document captures what the upstream contract is, the design choice
-we have to make on our side, the mapping table for each input set, and
-the validation plan. The code changes land on top of this memo on the
-same branch (`engine-upstream-switch`).
+Beyond the engine switch itself, the refactor reshapes how chapter
+scenarios reach the SCMs. The driving constraint is **traceability for
+IPCC review**: every output artefact has to make it obvious, without
+consulting a sidecar table, which RCMIP3 bundle row supplied the
+historical / natural / land-use forcings AND which chapter pathway the
+result belongs to. The chosen design carries both names as first-class
+data through the entire pipeline.
 
-## The upstream contract (the thing that's changed)
+## The upstream contract
 
-Upstream is 52 commits ahead of the fork, with zero commits behind. Most
-of those 52 are CI / coverage churn; the substantive ones (review/pr97
-series, merged via PRs #97 / #102 on the runner repo) tighten the
-adapter into a **strict canonical RCMIP3 mode**:
+Upstream's 52-commit lead over the fork is mostly CI / coverage churn,
+but the substantive series (review/pr97, merged via PRs #97 / #102 on
+the runner repo) tightens the FaIR2 and CICEROSCMPY2 adapters into a
+**strict canonical RCMIP3 mode**:
 
 - The `FAIR2` and `CICEROSCMPY2` adapters require an `rcmip3_bundle_path`
   argument at construction time -- the Zenodo 20430630 protocol bundle
@@ -24,151 +30,187 @@ adapter into a **strict canonical RCMIP3 mode**:
   land-use forcing for every scenario.
 - Scenarios passed to the adapter **must use canonical RCMIP3 names**
   (`ssp119`, `ssp245`, `ssp370`, `ssp585`, `abrupt-2xCO2`, `1pctCO2`,
-  `historical`, etc.). Anything else short-circuits through an empty
-  `bundle_df` filter and raises `KeyError 'scenario'` -- by design, not by
-  accident.
-- "Drop legacy bundle scenario/forcing paths" (commit `3a07afb`) and
-  "tighten error handling -- raise instead of warn-and-zero on canonical-
-  bundle misses" (`58f6af9`) make this explicit.
+  `historical`, ...). Anything else short-circuits through an empty
+  `bundle_df` filter and raises `KeyError 'scenario'` -- by design, not
+  by accident. The commits "Drop legacy bundle scenario/forcing paths"
+  (`3a07afb`) and "tighten error handling -- raise instead of warn-and-
+  zero on canonical-bundle misses" (`58f6af9`) make this explicit.
 
 The runner is no longer in the business of accepting arbitrary IAM
-scenario names. The chapter is. We need to bridge.
+scenario names. The chapter is.
 
-## Our design choice
+## Design: two-column representation, no hidden translation
 
-The bridge has to handle three input families that DON'T arrive with
-canonical RCMIP3 names:
+The chapter's input sets do not arrive with canonical RCMIP3 names:
 
 1. **SCI** (M4): ~1599 IAM pathways like `AIM/CGE 2.0 / SSP1-19`,
    `MESSAGE-iX / SSP2-Baseline`.
 2. **SSP2-COM** (M5): `MESSAGE-BASED / SSP2-com`.
 3. **ScenarioMIP CMIP7** (M6): `VL, L, LN, M, ML, H, HL`.
+4. **RCMIP3** (M7): `abrupt-2xCO2`, `1pctCO2`, ... (pass through; already
+   canonical).
 
-And one that does (M7 RCMIP3): `abrupt-2xCO2`, `1pctCO2`, etc. -- pass
-through unchanged.
+A reviewer reading any output artefact -- a NetCDF, the SCI batch
+`manifest.csv`, a classification CSV, a figure caption -- has to be able
+to answer two questions from the artefact alone:
 
-### Where the canonicalisation happens
+1. **Which RCMIP3 bundle row supplied the splice?** (`scenario=ssp245`
+   means the bundle's `ssp245` row provided solar / volcanic / land-use
+   forcings and pre-2023 historical emissions.)
+2. **Which chapter pathway is this?** (`pathway_id=SSP1-19` is the SCI
+   input, the figure label, the classification key.)
 
-Three options considered:
+Both names persist as first-class meta columns from the loader through
+to every output. No rename-on-the-fly inside the orchestrator; no
+sidecar dictionaries; no surprise translation visible only at debug
+time. The mapping is one explicit table in `src/ar7_ch5/_rcmip3_naming.py`
+that an IPCC reviewer can audit.
 
-| Option | Where | Pro | Con |
-|---|---|---|---|
-| A | each loader emits canonical names | one place per input | bleeds upstream's naming into our identifiers; downstream (`metrics.py`, `cache.py`, classification CSV, figures) all see `ssp245` instead of `SSP1-19`; chapter authors lose IAM/SSP identity at every step |
-| B | `runners/orchestrate.run_models` wraps the call: rename in, call adapter, restore on output | downstream sees our names throughout; only the adapter internals see canonical | small per-call overhead, restore logic must be robust to multi-scenario calls |
-| C | side channel via a new `rcmip3_scenario` meta column | preserves both names | upstream doesn't read a side column; would need upstream cooperation |
+### Loader contract
 
-**Going with (B)**. Loaders keep emitting our natural scenario names;
-`run_models` does the rename-call-restore around the adapter. Our
-output ScmRun preserves the original scenario column, so `metrics.py`,
-`cache.py`, the classification CSV, and the figures don't change.
+Each loader (`load.py`, `load_ssp2com.py`, `load_scenariomip.py`,
+`load_rcmip3.py`) emits a :class:`scmdata.ScmRun` whose meta carries:
 
-### What the canonical name actually selects in the bundle
+- `scenario`: the canonical RCMIP3 name. This is what the adapter
+  splices against.
+- `pathway_id`: the chapter-meaningful identifier. This is what figures,
+  the SCI batch manifest, `metrics.py`, `cache.py`, and post-processing
+  index by.
+- `model`: the IAM (SCI, SSP2-COM, ScenarioMIP) or `RCMIP3` (M7). This
+  layer is unchanged.
 
-The bundle row for a canonical name supplies:
+For RCMIP3 the two columns are identical (the chapter pathway IS the
+canonical name) -- intentional, harmless, keeps consumers uniform.
 
-- Pre-2023 historical emissions for the splice.
-- Natural forcing trajectory (solar + volcanic).
-- Land-use forcing trajectory.
+### Filename convention
 
-The user's emissions then overlay the post-2023 region. Our chapter
-runs all drive emissions (post-2023), so the canonical choice mainly
-controls **which SSP family the historical and natural / LU forcings
-come from**.
+Per-pathway NetCDFs are named on `pathway_id`, not on `scenario`:
 
-For the chapter, the SSP-family alignment is the right knob. Most of
-our scenarios *are* SSP-family-aligned in their original naming.
+    outputs/sci/<scm>/sci_<iam>_<pathway_id>.nc
+    outputs/scenariomip_cmip7/<scm>/scenariomip_<pathway_id>.nc
+    outputs/rcmip3/<scm>/rcmip3_<pathway_id>.nc
 
-## Proposed mapping
+This avoids the collision SCI would suffer otherwise: `SSP1-26` and
+`SSP1-34` both map to `scenario=ssp126`, so a `scenario`-keyed filename
+would clobber. `pathway_id`-keyed filenames are unique by construction.
 
-| Our scenario | Canonical | Notes |
+## Mapping table
+
+The SCI-pathway mapping uses the trailing target (the `NN` in
+`SSPx-NN`) when an RCMIP3 SSP-target combination exists, otherwise
+falls back to the SSP family's closest canonical:
+
+| Chapter scenario | Canonical | Notes |
 |---|---|---|
-| SCI: `SSP1-19` | `ssp119` | |
-| SCI: `SSP1-26`, `SSP1-34` | `ssp126` | |
-| SCI: `SSP2-*`, `SSP2-Baseline` | `ssp245` | |
-| SCI: `SSP3-*` | `ssp370` | |
-| SCI: `SSP4-*` | `ssp460` | |
-| SCI: `SSP5-*` | `ssp585` | |
-| SSP2-COM: `SSP2-com` | `ssp245` | same as Charlie's anchor SSP |
+| SCI: `SSPx-19` | `ssp119` | only `SSP1-19` is meaningful, but accept any family |
+| SCI: `SSPx-26` | `ssp126` | |
+| SCI: `SSPx-34` | `ssp126` | no canonical SSPx-34; SSP-family low fallback |
+| SCI: `SSPx-45` | `ssp245` | |
+| SCI: `SSPx-60` | `ssp460` | only `SSP4-60` is meaningful, but accept any family |
+| SCI: `SSPx-70` | `ssp370` | |
+| SCI: `SSPx-85` | `ssp585` | |
+| SCI: `SSP1-Baseline` | `ssp126` | SSP-family default |
+| SCI: `SSP2-Baseline` | `ssp245` | |
+| SCI: `SSP3-Baseline` | `ssp370` | |
+| SCI: `SSP4-Baseline` | `ssp460` | |
+| SCI: `SSP5-Baseline` | `ssp585` | |
+| SSP2-COM: `SSP2-com` | `ssp245` | same anchor SSP as Charlie's pipeline |
 | ScenarioMIP: `VL` | `ssp119` | closest very-low |
-| ScenarioMIP: `L`, `LN` | `ssp126` | low overshoot family |
+| ScenarioMIP: `L`, `LN` | `ssp126` | low / low-overshoot family |
 | ScenarioMIP: `M` | `ssp245` | medium |
 | ScenarioMIP: `ML`, `HL` | `ssp370` | medium-high / high-LU |
 | ScenarioMIP: `H` | `ssp585` | high |
-| RCMIP3 (M7) | pass-through | already canonical |
+| RCMIP3 (M7): `<canonical>` | `<canonical>` | pass through |
 
-The mapping lives in a small module (`src/ar7_ch5/_rcmip3_naming.py`)
-keyed by regex on the scenario name. Unknown scenarios fall back to
-`ssp245` with a NOTE printed.
+Unmapped chapter pathways fall to `ssp245` with a NOTE printed -- the
+neutral choice. The mapping is one named function in
+`src/ar7_ch5/_rcmip3_naming.py`; no regex magic, no implicit rules.
 
-## What needs to change (rough estimate, ~15 files)
+## What changes (file by file)
 
 ```
-pixi.toml                                EDIT  (engine pin -> upstream nonfork)
-pixi.lock                                EDIT  (regenerated)
-data/rcmip3_protocol/                    PRESENT  (already staged for M7)
+pixi.toml                                EDIT  pin upstream/feat/...-nonfork
+pixi.lock                                EDIT  regenerated
+data/rcmip3_protocol/                    PRESENT  already staged for M7
 
-src/ar7_ch5/_rcmip3_naming.py            NEW   (mapping + helpers)
-src/ar7_ch5/runners/__init__.py          EDIT  (resolve_rcmip3_bundle helper)
-src/ar7_ch5/runners/fair.py              EDIT  (pass bundle path through)
-src/ar7_ch5/runners/ciceroscm.py         EDIT  (same)
-src/ar7_ch5/runners/orchestrate.py       EDIT  (wrap-rename-restore in run_models)
+src/ar7_ch5/_rcmip3_naming.py            NEW   the mapping table
+src/ar7_ch5/runners/__init__.py          EDIT  resolve_rcmip3_bundle helper
+src/ar7_ch5/runners/fair.py              EDIT  pass bundle path
+src/ar7_ch5/runners/ciceroscm.py         EDIT  pass bundle path
+src/ar7_ch5/runners/orchestrate.py       no change (consumes ScmRun shape)
 
-docs/data_setup.md                       EDIT  (note RCMIP3 bundle now mandatory)
-docs/methods.md                          EDIT  (Vintage note + LU/natural-forcing concession)
-ar7-ch5-ensemble-brief.md                EDIT  (stack table; decisions log)
-README.md                                EDIT  (engine reference)
+src/ar7_ch5/load.py                      EDIT  emit pathway_id + scenario=canonical
+src/ar7_ch5/load_ssp2com.py              EDIT  same
+src/ar7_ch5/load_scenariomip.py          EDIT  same
+src/ar7_ch5/load_rcmip3.py               EDIT  emit pathway_id (= scenario)
 
-tests/test_rcmip3_naming.py              NEW   (mapping unit tests)
-tests/test_runners_smoke.py              EDIT  (verify SSP1-19 -> ssp119 round-trips)
-tests/test_*_experiment.py               re-run, no edits expected
+src/ar7_ch5/experiments/sci_ensemble.py  EDIT  pathway_id filenames + manifest col
+src/ar7_ch5/experiments/ssp2com.py       EDIT  pathway_id filename
+src/ar7_ch5/experiments/scenariomip_cmip7.py EDIT  pathway_id filename
+src/ar7_ch5/experiments/rcmip3.py        EDIT  pathway_id filename (= scenario)
+
+src/ar7_ch5/metrics.py                   EDIT  index pathways by pathway_id
+src/ar7_ch5/cache.py                     EDIT  expected names from pathway_id
+
+docs/data_setup.md                       EDIT  RCMIP3 bundle now mandatory
+docs/methods.md                          EDIT  LU / natural-forcings concession
+ar7-ch5-ensemble-brief.md                EDIT  stack table; decisions log
+README.md                                EDIT  engine reference
+
+tests/test_rcmip3_naming.py              NEW   mapping unit tests
+tests/test_load_*.py                     EDIT  assert both columns present + correct
+tests/test_*_experiment.py               EDIT  per-pathway NCs land with chapter id
+tests/test_runners_smoke.py              EDIT  SSP1-19 input -> SSP1-19 in output meta
+tests/test_metrics_smoke.py              EDIT  identity via pathway_id
+tests/test_cache.py                      EDIT  pathway_id-based expected names
 ```
 
-## Open decisions to settle before code
+~20 files. The orchestration / `run_models` layer is unchanged --
+loaders do the canonicalisation, downstream consumers read
+`pathway_id`. No hidden translation.
 
-1. **Mapping granularity for SSP*-Baseline pathways.** `SSP2-Baseline`
-   -> `ssp245` is uncontroversial. `SSP1-Baseline` (which is more of a
-   reference run than a 1.5C target)?  Default `ssp126` (SSP1-family) or
-   `ssp245` (generic baseline)? My lean: `ssp126`.
+## LU / natural-forcings concession
 
-2. **Land-use / natural forcings concession.** Each SCI pathway in,
-   e.g., the SSP2 family ends up with **the same LU + natural forcings
-   from the bundle's `ssp245` row**, regardless of which IAM produced
-   the pathway. Original MAGICC SCI runs used the SCI-vintage AR6
-   forcings instead. This is a real divergence and should land in
-   `docs/methods.md` as a note alongside the SCI-vintage caveat. Is
-   that acceptable as v1, or do we want to override LU forcings from
-   our own input? My lean: acceptable as v1, document the choice.
+Every chapter pathway in an SSP family ends up with the **bundle's row
+for that family** supplying solar / volcanic / land-use forcings. For
+SCI specifically, all ~600 SSP2-* pathways share the bundle's `ssp245`
+LU + natural forcings, regardless of which IAM produced the pathway.
 
-3. **Output preservation strategy.** Wrap-and-restore in `run_models`
-   means downstream sees our names. Confirm this is the right axis to
-   pin: chapter authors and figures think in `SSP1-19`, not `ssp119`.
-
-4. **MAGICC**. Still emissions-driven only; the conc-driven model
-   filter from M7 already handles this. No change here.
+This is a real divergence from the original MAGICC SCI runs (which used
+SCI-vintage AR6 forcings). The dominant emissions signal still comes
+from the user's overlay, so the practical impact on warming outcomes is
+modest, but the concession is documented in `docs/methods.md` alongside
+the existing SCI-vintage caveat. The full SCI re-run on the new pin
+provides the empirical magnitude.
 
 ## Validation plan
 
-- Fast suite stays green: 48 passed / 1 skipped.
-- `tests/test_rcmip3_naming.py` covers each of the families above and
-  the SSP*-Baseline edge cases (TBD per decision 1).
-- `tests/test_runners_smoke.py` runs `SSP1-19` through FaIR and CICERO;
-  asserts the output's scenario column reads `SSP1-19` (not
-  `ssp119`).
-- M5, M6, M7 experiment smoke tests pass unchanged.
-- Side-by-side: pick one SCI pathway (`AIM/CGE 2.0 / SSP1-19`), run on
-  fork and on upstream + canonicalisation, compare GSAT_2100. Expect
-  a small delta from LU / natural forcings differing. Document the
-  delta in `docs/methods.md`.
+- Fast suite stays green (48 passed / 1 skipped baseline).
+- `tests/test_rcmip3_naming.py` covers the mapping table family by
+  family + the SSP*-Baseline edge cases (the Open question above).
+- `tests/test_load_*.py` assert each loader's output ScmRun carries
+  `scenario` (canonical) and `pathway_id` (chapter) columns with the
+  right values.
+- `tests/test_runners_smoke.py` runs `SSP1-19` end-to-end and asserts
+  the output's `pathway_id` reads `SSP1-19` and `scenario` reads
+  `ssp119`. Filename matches `sci_AIM-CGE-2.0_SSP1-19.nc`.
+- M5 / M6 / M7 smoke tests run unchanged; their assertions on filenames
+  and shapes get updated to `pathway_id` naming.
+- Side-by-side: pick one SCI pathway, run on fork and on new pin,
+  compare GSAT_2100. Document the delta in `docs/methods.md`.
 
-## What this PR does NOT do
+## Out of scope
 
-- It does not change scenario naming in any output or report.
-- It does not touch the figure layer.
-- It does not re-run the full SCI ensemble. The post-switch full re-run
-  is a follow-up (and a multi-day batch).
+- Full SCI ensemble re-run (multi-day batch; follow-up).
+- Renaming scenarios in any chapter narrative (the chapter pathway
+  names remain SSP1-19 etc.).
+- Touching the figure layer or M3 classification (both already key on
+  chapter identity from the SCI xlsx, not from SCM outputs).
 
-## Open question for review
+## Locked decisions
 
-Sign-off on the mapping table (especially Baseline rows), the LU /
-natural-forcings concession, and the wrap-and-restore strategy. After
-that the implementation is ~mechanical.
+| # | Decision | Resolution |
+|---|---|---|
+| 1 | SSP1-Baseline mapping | `ssp126` (SSP-family default) |
+| 2 | LU / natural-forcings concession | document in `methods.md`; accept as v1 |
+| 3 | Naming approach | **two-column representation** (`scenario` canonical + `pathway_id` chapter); no hidden translation in orchestration |
