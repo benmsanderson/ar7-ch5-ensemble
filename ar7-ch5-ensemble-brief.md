@@ -370,7 +370,14 @@ fork as the engine.
    `project_classification_warming_contract`.
 7. **CI workflow.** `.github/workflows/` for running at least `pytest`
    and `ruff` on PRs is still to set up.
-8. **MAGICC concentration-driven adapter.** Required by milestone 7
-   (RCMIP3). FaIR and CICERO-SCM already declare it; MAGICC does not.
-   Decision deferred to when M7 starts: wire it in the engine fork
-   first, or ship M7 as a FaIR + CICERO ensemble and add MAGICC later.
+8. **MAGICC concentration-driven adapter.** Decided: M7 ships as a
+   FaIR + CICERO-SCM concentration-driven experiment for now; MAGICC's
+   adapter does not yet declare `CONCENTRATION_DRIVEN`, and engine
+   changes to that adapter are upstream maintainer territory rather
+   than something to slot in here. The M7 experiment filters models
+   via
+   `ar7_ch5.runners.orchestrate.models_supporting(CONCENTRATION_DRIVEN)`
+   and prints a NOTE listing any requested model that was dropped; the
+   filter auto-includes MAGICC as soon as the adapter gains
+   concentration-driven support, with no further changes required
+   here.
