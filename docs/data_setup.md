@@ -33,7 +33,21 @@ produced with the AR6 climate-assessment workflow and run through MAGICC
 v7.5.3. We use those directly rather than re-harmonising (see
 `docs/methods.md`).
 
-## 2. MAGICC v7.5.3 binary (licensed)
+## 2. SSP2-COM world-total (from scenariocompass)
+
+The world-total SSP2-COM file is small (~17 KB, 23 species, World, 2023-2100)
+and lives in Ben's scenariocompass repository under `data/ssp2com/`. Drop a
+copy or a symlink to:
+
+    data/ssp2com/ssp2-com_world_total.xlsx
+
+The loader reads only the world-total sheet; regional, sectoral, and China
+granularities exist in the same scenariocompass directory but are not needed
+for the SCM workflow. Pre-2023 history is left to each SCM's bundle /
+historical splice; harmonisation to the 2023 history endpoint is done by the
+light global harmoniser (see `src/ar7_ch5/harmonise.py` and section 4 below for the history anchor file).
+
+## 3. MAGICC v7.5.3 binary (licensed)
 
 MAGICC is a licensed binary and is not redistributed in this repo. Obtain it
 from https://www.magicc.org/ (the v7.5.3 binary plus the AR6 probabilistic
@@ -46,7 +60,7 @@ On NAC it is staged at
 AR6 drawnset alongside in `magicc-dist/ar6_prob/`. Put the export in your shell
 profile or a gitignored `.env.local`.
 
-## 3. Everything else (Zenodo)
+## 4. Everything else (Zenodo)
 
 The remaining inputs are fetched from their Zenodo archives:
 

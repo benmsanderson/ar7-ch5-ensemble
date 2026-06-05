@@ -36,6 +36,9 @@ numpy = "*"
 pandas = ">=2.2"
 scipy = "*"
 netcdf4 = "*"
+# pyarrow reads the global history anchor (feather, Zenodo 17845154) used by
+# the light SSP2-COM harmoniser.
+pyarrow = "*"
 openpyxl = "*"
 matplotlib = "*"
 tqdm = "*"

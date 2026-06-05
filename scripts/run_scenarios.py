@@ -19,6 +19,8 @@ import sys
 from pathlib import Path
 
 from ar7_ch5.experiments.sci_ensemble import run_sci_batch
+from ar7_ch5.experiments.ssp2com import run_ssp2com
+from ar7_ch5.harmonise import DEFAULT_ANCHOR_YEAR, DEFAULT_CONVERGENCE_YEAR
 from ar7_ch5.load import available_sci_scenarios, load_sci_infilled
 from ar7_ch5.runners import DEFAULT_MAX_WORKERS, repo_root
 from ar7_ch5.runners.orchestrate import run_models
@@ -28,6 +30,15 @@ MODELS = ["fair", "ciceroscm", "magicc"]
 
 DEFAULT_SCI_XLSX = (
     repo_root() / "data" / "SCI" / "SCI-2025_v1.0_pathways_ensemble_global.xlsx"
+)
+DEFAULT_SSP2COM_XLSX = (
+    repo_root() / "data" / "ssp2com" / "ssp2-com_world_total.xlsx"
+)
+# Where the global history anchor lives on NAC. Other machines should set
+# AR7_HARMONISATION_HISTORY or pass --history explicitly.
+DEFAULT_HARMONISATION_HISTORY = Path(
+    "/storage/no-backup-nac/users/bensan/emissions_harmonization_historical/"
+    "data/processed/history-for-harmonisation/zenodo_17845154/db"
 )
 
 
@@ -49,8 +60,32 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--input",
         type=Path,
-        default=DEFAULT_SCI_XLSX,
-        help="Path to the SCI ensemble xlsx (default: data/SCI/...).",
+        default=None,
+        help="Path to the input file. Defaults are experiment-specific: "
+        "for 'sci' the SCI ensemble xlsx (data/SCI/...), for 'ssp2com' the "
+        "world-total xlsx (data/ssp2com/...).",
+    )
+    parser.add_argument(
+        "--history",
+        type=Path,
+        default=None,
+        help="Path to the global history anchor (sharded feather dir from "
+        "emissions-harmonisation-historical Zenodo 17845154). Only used by "
+        "--experiment ssp2com. Default: AR7_HARMONISATION_HISTORY env var, "
+        "else the NAC staged location.",
+    )
+    parser.add_argument(
+        "--anchor-year",
+        type=int,
+        default=DEFAULT_ANCHOR_YEAR,
+        help=f"Harmonisation anchor year (ssp2com only). Default {DEFAULT_ANCHOR_YEAR}.",
+    )
+    parser.add_argument(
+        "--convergence-year",
+        type=int,
+        default=DEFAULT_CONVERGENCE_YEAR,
+        help=f"Harmonisation correction tapers to zero by this year (ssp2com only). "
+        f"Default {DEFAULT_CONVERGENCE_YEAR}.",
     )
     parser.add_argument(
         "--iam",
@@ -111,11 +146,18 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
+    if args.experiment == "ssp2com":
+        return _run_ssp2com(args)
+
     if args.experiment != "sci":
         raise SystemExit(
-            f"experiment={args.experiment!r} is not wired yet; only 'sci' runs "
-            "in milestone 2 (see ar7-ch5-ensemble-brief.md)."
+            f"experiment={args.experiment!r} is not wired yet; M6 (scenariomip_cmip7) "
+            "and M7 (rcmip3) are still to come (see ar7-ch5-ensemble-brief.md)."
         )
+
+    # Fall through to the SCI path.
+    if args.input is None:
+        args.input = DEFAULT_SCI_XLSX
 
     if args.list:
         for iam, scenario in available_sci_scenarios(args.input):
@@ -152,6 +194,36 @@ def main(argv: list[str] | None = None) -> int:
     result.to_csv(out_path)
     print(f"Wrote {out_path}")
 
+    _report_gsat(result)
+    return 0
+
+
+def _run_ssp2com(args) -> int:
+    """Run the SSP2-COM world-total pathway through the chosen models."""
+    import os
+
+    xlsx = args.input or DEFAULT_SSP2COM_XLSX
+    history = (
+        args.history
+        or Path(os.environ.get("AR7_HARMONISATION_HISTORY", DEFAULT_HARMONISATION_HISTORY))
+    )
+
+    out_dir = Path(args.output) / "ssp2com"
+    n_members = 200 if args.n_members is None else args.n_members
+    print(
+        f"Running SSP2-COM through {args.models} at n_members={n_members} "
+        f"-> {out_dir} (one NetCDF per SCM)."
+    )
+
+    result = run_ssp2com(
+        xlsx, history,
+        models=args.models,
+        n_members=n_members,
+        output_dir=out_dir,
+        max_workers=args.max_workers,
+        anchor_year=args.anchor_year,
+        convergence_year=args.convergence_year,
+    )
     _report_gsat(result)
     return 0
 
