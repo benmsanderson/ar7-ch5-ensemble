@@ -31,3 +31,6 @@ dist/
 .DS_Store
 .vscode/
 .idea/
+
+# Jupytext generates .ipynb on demand; only the paired .py is tracked.
+notebooks/**/*.ipynb

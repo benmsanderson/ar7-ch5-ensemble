@@ -1,0 +1,19 @@
+# Per-figure spec for AR7 WG1 Ch5 figures.
+#
+# Each top-level key is a figure id (also the filename for output and the
+# matching notebook script). Figure scripts in `notebooks/figXX_*.py` load
+# their slice via `ar7_ch5.figures.load_config(<figure_id>)`.
+#
+# Keep entries small; per-figure detail (axis ranges, annotations) lives
+# in the script. The config controls "which data goes into this figure"
+# decisions that chapter authors would want to edit by hand.
+
+fig01_classification:
+  title: GW0-GW8 classification distribution (SCI)
+  experiment: sci
+  # xlsx == MAGICC percentiles baked in the SCI xlsx (the regression path).
+  # per_model / pooled use the 3-SCM ensemble metrics path (M5+).
+  source: xlsx
+  # Plot both the full set and the vetted-only subset side-by-side.
+  show_vetted_only: true
+  output_formats: [png, pdf]

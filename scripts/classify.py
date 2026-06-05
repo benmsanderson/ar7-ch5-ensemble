@@ -79,8 +79,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("outputs/classification.csv"),
-        help="Output CSV path.",
+        default=None,
+        help="Output CSV path. Default: outputs/classification_<source>.csv "
+        "(picked up by the figure layer via ar7_ch5.cache).",
     )
     return parser
 
@@ -184,6 +185,8 @@ def _classify_from_metrics(df: pd.DataFrame, args) -> pd.DataFrame:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.output is None:
+        args.output = Path(f"outputs/classification_{args.source}.csv")
 
     print(f"Loading {args.input.name}...")
     df = load_sci_iamc_global(args.input)
