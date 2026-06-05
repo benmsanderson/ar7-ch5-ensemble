@@ -25,11 +25,13 @@ from pathlib import Path
 import pandas as pd
 import scmdata
 
+from ._rcmip3_naming import canonical_for
 from .load import CANONICAL_EMISSIONS, FAIR_TO_CANONICAL
 
-# Long scenario names in the published file map onto the chapter's short
-# labels via the existing ``scenario`` column; keep both for figure-side
-# joins that prefer the long form.
+# Chapter pathway identifiers (the short labels used throughout the
+# chapter / figures). These flow through to the ``pathway_id`` meta column
+# on the loaded ScmRun; the ``scenario`` column carries the canonical
+# RCMIP3 name (see :mod:`ar7_ch5._rcmip3_naming`).
 SCENARIOS = ("VL", "L", "LN", "M", "ML", "H", "HL")
 
 _REQUIRED_COLUMNS = frozenset({"model", "scenario", "region", "variable", "unit"})
@@ -102,5 +104,10 @@ def load_scenariomip_emissions(
     # produce two .5 offsets falling into the same integer year (rare; drop
     # duplicates by keeping the first).
     df = df.loc[:, ~df.columns.duplicated()]
+
+    # Preserve the chapter pathway id on ``pathway_id`` and rewrite ``scenario``
+    # to the RCMIP3 canonical the runner splices against.
+    df["pathway_id"] = df["scenario"]
+    df["scenario"] = df["scenario"].map(canonical_for)
 
     return scmdata.ScmRun(df)

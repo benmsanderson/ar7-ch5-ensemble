@@ -15,9 +15,11 @@ adapter gains concentration-driven support (no code change here is
 required -- the model list is filtered via
 :func:`ar7_ch5.runners.orchestrate.models_supporting`).
 
-Writes one NetCDF per (scenario, SCM) under
-``<output_dir>/<scm>/rcmip3_<scenario>.nc``, mirroring the SCI batch
-layout so :mod:`ar7_ch5.metrics` consumes both with the same code path.
+Writes one NetCDF per (pathway, SCM) under
+``<output_dir>/<scm>/rcmip3_<pathway_id>.nc``, mirroring the SCI batch
+layout. RCMIP3 scenarios are canonical by construction, so
+``pathway_id == scenario`` here (e.g. ``abrupt-4xCO2``); the column is
+emitted for cross-experiment uniformity with M4 / M5 / M6.
 """
 
 from __future__ import annotations
@@ -34,7 +36,7 @@ from ..runners import (
     DEFAULT_OUTPUT_VARIABLES,
     MODEL_NAMES,
 )
-from ..runners.orchestrate import models_supporting, run_models
+from ..runners.orchestrate import attach_pathway_id, models_supporting, run_models
 
 NC_DIMENSIONS = ("run_id", "region", "variable")
 
@@ -99,7 +101,7 @@ def run_rcmip3(
     all_scens = load_rcmip3_concentrations(
         bundle_path, scenarios=scenarios, end_year=end_year,
     )
-    requested = sorted(all_scens.get_unique_meta("scenario"))
+    requested = sorted(all_scens.get_unique_meta("pathway_id"))
     print(
         f"  {len(requested)} scenarios ({requested}), "
         f"{len(all_scens.get_unique_meta('variable'))} species, "
@@ -111,22 +113,23 @@ def run_rcmip3(
 
     pieces: list[scmdata.ScmRun] = []
     for scm in supported:
-        print(f"Running {scm} on {len(requested)} scenarios at n_members={n_members}...")
-        result = run_models(
-            all_scens, [scm],
-            n_members=n_members,
-            output_variables=output_variables,
-            max_workers=max_workers,
-            mode=RunMode.CONCENTRATION_DRIVEN,
-        )
         scm_dir = out / scm
         scm_dir.mkdir(parents=True, exist_ok=True)
-        for sc in sorted(result.get_unique_meta("scenario")):
-            sub = result.filter(scenario=sc)
-            target = scm_dir / f"rcmip3_{sc}.nc"
-            sub.to_nc(target, dimensions=list(NC_DIMENSIONS))
-            print(f"  wrote {target} ({sub.shape[0]} rows)")
-        pieces.append(result)
+        for pid in requested:
+            one_pathway = all_scens.filter(pathway_id=pid)
+            print(f"Running {scm} on {pid} at n_members={n_members}...")
+            result = run_models(
+                one_pathway, [scm],
+                n_members=n_members,
+                output_variables=output_variables,
+                max_workers=max_workers,
+                mode=RunMode.CONCENTRATION_DRIVEN,
+            )
+            result = attach_pathway_id(result, pid)
+            target = scm_dir / f"rcmip3_{pid}.nc"
+            result.to_nc(target, dimensions=list(NC_DIMENSIONS))
+            print(f"  wrote {target} ({result.shape[0]} rows)")
+            pieces.append(result)
 
     return scmdata.run_append(pieces) if pieces else scmdata.ScmRun(
         all_scens.timeseries()

@@ -21,6 +21,7 @@ from pathlib import Path
 import pandas as pd
 import scmdata
 
+from ._rcmip3_naming import canonical_for
 from .load import (
     CANONICAL_EMISSIONS,
     _canonicalise_unit,
@@ -28,8 +29,12 @@ from .load import (
     _interpolate_annual,
 )
 
-SSP2COM_SCENARIO = "SSP2-com"
+# Chapter pathway identifier (preserved on the ``pathway_id`` meta column).
+SSP2COM_PATHWAY_ID = "SSP2-com"
 SSP2COM_MODEL = "MESSAGE-BASED"
+# Canonical RCMIP3 scenario whose bundle row supplies the historical splice
+# and natural / land-use forcings (set on the ``scenario`` meta column).
+SSP2COM_CANONICAL_SCENARIO = canonical_for(SSP2COM_PATHWAY_ID)
 
 _REQUIRED_COLUMNS = frozenset({"model", "scenario", "region", "variable", "unit"})
 
@@ -75,6 +80,12 @@ def load_ssp2com_world_total(
             f"No SSP2-COM rows survived canonicalisation of {path} "
             f"(region={region!r})."
         )
+
+    # Attach pathway_id (the chapter identifier) and rewrite scenario to the
+    # RCMIP3 canonical name the upstream runner splices against. See
+    # ar7_ch5._rcmip3_naming.canonical_for and docs/engine_upstream_switch.md.
+    df["pathway_id"] = df["scenario"]
+    df["scenario"] = df["scenario"].map(canonical_for)
 
     run = scmdata.ScmRun(df)
     if to_annual:

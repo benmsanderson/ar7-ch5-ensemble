@@ -16,6 +16,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 
 import openscm_runner.run
+import pandas as pd
 import scmdata
 from openscm_runner import RunMode
 from openscm_runner.adapters import CICEROSCMPY2, FAIR2, MAGICC7
@@ -115,6 +116,26 @@ def build_adapters(
             kwargs["max_workers"] = max_workers
         adapters.append(_BUILDERS[m](**kwargs))
     return adapters
+
+
+def attach_pathway_id(result: scmdata.ScmRun, pathway_id: str) -> scmdata.ScmRun:
+    """Stamp ``pathway_id`` as a constant meta column on every row of ``result``.
+
+    Adapters often drop non-standard meta columns. Experiments that run one
+    pathway at a time (the convention now that scenarios collide on
+    canonical names, e.g. ``L`` / ``LN`` both -> ``ssp126``) can recover the
+    chapter pathway id (the iteration variable) by calling this on the
+    adapter's output before writing the NetCDF. Downstream consumers
+    (:mod:`ar7_ch5.metrics`, :mod:`ar7_ch5.cache`, the figure layer) then
+    read ``pathway_id`` for chapter identity. See
+    ``docs/engine_upstream_switch.md``.
+    """
+    ts = result.timeseries()
+    names = [n for n in ts.index.names if n != "pathway_id"]
+    arrays = [ts.index.get_level_values(n) for n in names]
+    arrays.append([pathway_id] * len(ts))
+    ts.index = pd.MultiIndex.from_arrays(arrays, names=[*names, "pathway_id"])
+    return scmdata.ScmRun(ts)
 
 
 def run_models(

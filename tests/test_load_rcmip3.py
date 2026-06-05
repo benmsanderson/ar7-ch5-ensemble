@@ -31,6 +31,9 @@ def run():
 
 def test_default_diagnostics(run):
     assert sorted(run.get_unique_meta("scenario")) == sorted(DEFAULT_DIAGNOSTICS)
+    # RCMIP3 scenarios are already canonical: pathway_id == scenario, emitted
+    # for cross-experiment uniformity with M4 / M5 / M6.
+    assert sorted(run.get_unique_meta("pathway_id")) == sorted(DEFAULT_DIAGNOSTICS)
 
 
 def test_atmospheric_concentrations_only(run):

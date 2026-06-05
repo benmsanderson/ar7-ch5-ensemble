@@ -42,11 +42,12 @@ def test_status_for_scenariomip_missing(tmp_path):
     assert all(name.startswith("scenariomip_") for name in entry.examples_missing)
 
 
-def test_status_for_ssp2com_present_long_climate_model_name(tmp_path):
-    """SSP2-COM writes one NC per climate_model (long name); ensure detection."""
-    ssp2 = tmp_path / "ssp2com"
-    ssp2.mkdir()
-    (ssp2 / "FaIRv2.2.4.nc").write_bytes(b"")
+def test_status_for_ssp2com_pathway_present(tmp_path):
+    """SSP2-COM writes one NetCDF per pathway under outputs/ssp2com/<scm>/."""
+    from ar7_ch5.load_ssp2com import SSP2COM_PATHWAY_ID
+    fair_dir = tmp_path / "ssp2com" / "fair"
+    fair_dir.mkdir(parents=True)
+    (fair_dir / f"ssp2com_{SSP2COM_PATHWAY_ID}.nc").write_bytes(b"")
     entry = cache.status_for("ssp2com", "fair", outputs_dir=tmp_path)
     assert entry.present == 1
     assert entry.complete

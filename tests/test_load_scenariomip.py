@@ -29,8 +29,13 @@ def run():
     return load_scenariomip_emissions(CSV)
 
 
-def test_seven_scenarios(run):
-    assert sorted(run.get_unique_meta("scenario")) == sorted(SCENARIOS)
+def test_seven_pathways(run):
+    """Each chapter pathway id (``VL`` ... ``H``) appears once, with the
+    parallel ``scenario`` column carrying its canonical RCMIP3 SSP."""
+    from ar7_ch5._rcmip3_naming import canonical_for
+    assert sorted(run.get_unique_meta("pathway_id")) == sorted(SCENARIOS)
+    expected_canonical = sorted({canonical_for(s) for s in SCENARIOS})
+    assert sorted(run.get_unique_meta("scenario")) == expected_canonical
 
 
 def test_canonical_emissions_only(run):
@@ -51,10 +56,13 @@ def test_annual_axis_clipped_to_2100(run):
 
 
 def test_subset_filter():
+    """``scenarios=`` filters on chapter pathway ids (the user's labels)."""
     if not CSV.is_file():
         pytest.skip(f"ScenarioMIP CSV not staged at {CSV}")
     sub = load_scenariomip_emissions(CSV, scenarios=("M", "H"))
-    assert sorted(sub.get_unique_meta("scenario")) == ["H", "M"]
+    assert sorted(sub.get_unique_meta("pathway_id")) == ["H", "M"]
+    # canonical_for("M") == "ssp245", canonical_for("H") == "ssp370"
+    assert sorted(sub.get_unique_meta("scenario")) == ["ssp245", "ssp370"]
 
 
 def test_unknown_scenario_raises():

@@ -45,12 +45,16 @@ def test_writes_per_scenario_netcdf(result, out_dir):
 
 
 def test_2100_gsat_well_ordered(result):
-    """VL < H at 2100 GSAT median: low-emissions scenario is cooler."""
+    """VL < H at 2100 GSAT median: low-emissions pathway is cooler.
+
+    Filters on ``pathway_id`` (the chapter identifier), not ``scenario``
+    (the canonical RCMIP3 name -- ``ssp119`` for VL, ``ssp370`` for H).
+    """
     gsat = result.filter(
         variable="Surface Air Temperature Change", region="World", year=2100
     )
-    vl = gsat.filter(scenario="VL").values.mean()
-    h = gsat.filter(scenario="H").values.mean()
+    vl = gsat.filter(pathway_id="VL").values.mean()
+    h = gsat.filter(pathway_id="H").values.mean()
     assert 0.5 < vl < 2.5, f"VL 2100 GSAT={vl} outside physical band"
     assert 2.0 < h < 6.0, f"H 2100 GSAT={h} outside physical band"
     assert vl < h, f"expected VL < H at 2100; got VL={vl}, H={h}"

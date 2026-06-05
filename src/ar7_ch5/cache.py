@@ -83,25 +83,24 @@ def _sci_status(outputs_dir: Path, scm: str) -> CacheEntry:
 
 
 def _ssp2com_status(outputs_dir: Path, scm: str) -> CacheEntry:
-    """SSP2-COM writes one NetCDF per climate_model, named with the long
-    climate_model string (e.g. ``FaIRv2.2.4.nc``). Detect via prefix match."""
-    long_prefixes = {
-        "fair":      "FaIR",
-        "ciceroscm": "CICERO",
-        "magicc":    "MAGICC",
-    }
-    prefix = long_prefixes.get(scm, scm)
-    ssp2_dir = outputs_dir / "ssp2com"
-    present = (
-        sum(1 for f in ssp2_dir.glob("*.nc") if f.name.startswith(prefix))
-        if ssp2_dir.is_dir() else 0
+    """One NetCDF per pathway under outputs/ssp2com/<scm>/."""
+    from .load_ssp2com import SSP2COM_PATHWAY_ID
+
+    expected_names = {f"ssp2com_{SSP2COM_PATHWAY_ID}.nc"}
+    scm_dir = outputs_dir / "ssp2com" / scm
+    present_files = (
+        sorted(p.name for p in scm_dir.glob("*.nc")) if scm_dir.is_dir() else []
     )
+    present = len(set(present_files) & expected_names)
+    examples = tuple(sorted(expected_names - set(present_files))[:3])
     return CacheEntry(
-        experiment="ssp2com", scm=scm, expected=1, present=min(present, 1),
+        experiment="ssp2com", scm=scm,
+        expected=len(expected_names), present=present,
         rerun_cmd=(
             f"pixi run python scripts/run_scenarios.py --experiment ssp2com "
             f"--models {scm}"
         ),
+        examples_missing=examples,
     )
 
 

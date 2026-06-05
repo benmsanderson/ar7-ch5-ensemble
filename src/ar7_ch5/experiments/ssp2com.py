@@ -3,10 +3,10 @@
 One pathway, three SCMs. The world-total SSP2-COM xlsx is loaded
 (:mod:`ar7_ch5.load_ssp2com`), harmonised to the CMIP7 2023 anchor
 (:mod:`ar7_ch5.harmonise`), then handed to the orchestrator
-(:func:`ar7_ch5.runners.orchestrate.run_models`). One NetCDF per SCM is
-written under ``<output_dir>/<scm>.nc``; the file shape and meta columns
-match the per-pathway NetCDFs the SCI batch writes, so the same
-:mod:`ar7_ch5.metrics` plumbing consumes both.
+(:func:`ar7_ch5.runners.orchestrate.run_models`). One NetCDF per
+(pathway, SCM) is written under ``<output_dir>/<scm>/ssp2com_<pathway_id>.nc``,
+matching the SCI / ScenarioMIP / RCMIP3 layout so the cache reporter
+and :mod:`ar7_ch5.metrics` see one shape across experiments.
 
 Validation against Charlie Koven's FaIR-only SSP2-COM output lives in a
 follow-up commit.
@@ -31,7 +31,7 @@ from ..runners import (
     DEFAULT_OUTPUT_VARIABLES,
     MODEL_NAMES,
 )
-from ..runners.orchestrate import run_models
+from ..runners.orchestrate import attach_pathway_id, run_models
 
 # Shape the per-SCM NetCDF the same way the SCI batch does so metrics.py
 # can read both with the same code path.
@@ -97,20 +97,29 @@ def run_ssp2com(
         anchor_year=anchor_year, convergence_year=convergence_year,
     )
 
-    print(f"Running {models} at n_members={n_members}...")
-    result = run_models(
-        harmonised, models,
-        n_members=n_members,
-        output_variables=output_variables,
-        max_workers=max_workers,
-    )
-
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
-    for scm in sorted(result.get_unique_meta("climate_model")):
-        sub = result.filter(climate_model=scm)
-        target = out / f"{scm.replace('/', '-').replace(' ', '-')}.nc"
-        sub.to_nc(target, dimensions=list(NC_DIMENSIONS))
-        print(f"  wrote {target} ({sub.shape[0]} rows)")
 
-    return result
+    pathway_ids = sorted(harmonised.get_unique_meta("pathway_id"))
+    pieces: list[scmdata.ScmRun] = []
+    for scm in models:
+        scm_dir = out / scm
+        scm_dir.mkdir(parents=True, exist_ok=True)
+        for pid in pathway_ids:
+            one_pathway = harmonised.filter(pathway_id=pid)
+            print(f"Running {scm} on {pid} at n_members={n_members}...")
+            result = run_models(
+                one_pathway, [scm],
+                n_members=n_members,
+                output_variables=output_variables,
+                max_workers=max_workers,
+            )
+            result = attach_pathway_id(result, pid)
+            target = scm_dir / f"ssp2com_{pid}.nc"
+            result.to_nc(target, dimensions=list(NC_DIMENSIONS))
+            print(f"  wrote {target} ({result.shape[0]} rows)")
+            pieces.append(result)
+
+    return scmdata.run_append(pieces) if pieces else scmdata.ScmRun(
+        harmonised.timeseries()
+    )
