@@ -1,0 +1,14 @@
+# Jupytext pairing for the figure notebooks.
+#
+# Each notebooks/figXX_*.py is the source of truth: tracked in git, lintable,
+# CI-friendly. JupyterLab opens it as a paired notebook on the fly; the
+# generated .ipynb is gitignored.
+#
+# Format: percent (# %% cell markers) -- diffs cleanly, runs as a plain
+# `python notebooks/figXX_*.py` script too.
+
+formats = "notebooks///py:percent,notebooks///ipynb"
+
+# Strip output / metadata bloat from any .ipynb someone happens to save.
+notebook_metadata_filter = "-all"
+cell_metadata_filter = "-all"

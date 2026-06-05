@@ -1,0 +1,47 @@
+# Shared style for AR7 WG1 Ch5 figures.
+#
+# Colour palettes lifted from `scenariomip-paper-plots` (the GMD paper) for
+# the ScenarioMIP scenarios, and from scenariocompass for the GW0-GW8
+# classification categories. Adopted as a starting point, not strict
+# adherence -- tweak here, not in scripts.
+#
+# Loaded by `ar7_ch5.figures.load_style()`. Figure scripts use the colours
+# by referencing keys (e.g. `style.scenario_colors["VL"]`,
+# `style.gw_colors["GW2"]`) so a global tweak here propagates everywhere.
+
+# ScenarioMIP CMIP7 scenario palette (cool -> warm by 2100 GSAT).
+scenario_colors:
+  VL:     "#1d3d8a"   # deep blue       (~1.6 K, GW4)
+  LN:     "#3b7cc9"   # medium blue     (~1.7 K, GW4)
+  L:      "#6bb5e8"   # light blue      (~1.9 K, GW4)
+  SSP2COM: "#8ecda0"  # sage green      (~2.2 K, GW5)
+  ML:     "#f5c242"   # golden amber    (~2.5 K, GW5)
+  HL:     "#e8852a"   # warm orange     (~3.0 K, GW6)
+  M:      "#d43820"   # tomato red      (~3.2 K, GW6)
+  H:      "#7a0c10"   # deep crimson    (~3.8 K, GW8)
+
+# SCM palette (used when overlaying per-SCM results).
+scm_colors:
+  fair:      "#1f77b4"
+  ciceroscm: "#2ca02c"
+  magicc:    "#d62728"
+
+# GW0-GW8 classification palette (from scenariocompass).
+gw_colors:
+  GW0: "#1a237e"
+  GW1: "#1565c0"
+  GW2: "#2196f3"
+  GW3: "#26a69a"
+  GW4: "#fdd835"
+  GW5: "#ff9800"
+  GW6: "#f4511e"
+  GW7: "#c62828"
+  GW8: "#4a148c"
+  unclassified: "#9e9e9e"
+
+# Output knobs.
+dpi: 300
+default_format: png        # used when figure entry doesn't pin output_formats
+fig_size_inches: [7.0, 4.5]  # default; figures override via matplotlib if they want
+font_family: sans-serif
+font_size: 10
