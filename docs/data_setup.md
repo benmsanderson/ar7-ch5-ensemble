@@ -67,7 +67,24 @@ scenarios.
 SSP2-COM, the eighth scenario the chapter reports alongside these seven,
 is sourced separately from scenariocompass (see section 2).
 
-## 4. MAGICC v7.5.3 binary (licensed)
+## 4. RCMIP3 protocol bundle (Zenodo 20430630)
+
+The RCMIP Phase 3 protocol bundle ships three wide-table CSVs (concentrations,
+emissions, forcing) covering the 25 RCMIP3 scenarios -- the ECS / TCR / TCRE
+idealised set (abrupt-2xCO2, abrupt-4xCO2, 1pctCO2 family, piControl), the
+concentration-driven SSP set, and historical attribution variants. v1 of this
+repository uses the concentrations CSV only (for the chapter's concentration-
+driven RCMIP3 diagnostics). Fetch the bundle from
+https://zenodo.org/records/20430630 (single ~37 MB zip), unzip it, and place
+or symlink the `RCMIP3_input_datafiles/` subdirectory under:
+
+    data/rcmip3_protocol/RCMIP3_input_datafiles/
+
+The loader accepts either the bundle root, the subdir, or the direct CSV.
+On NAC the bundle is already staged at
+`/storage/no-backup-nac/users/bensan/rcmip3_protocol/`.
+
+## 5. MAGICC v7.5.3 binary (licensed)
 
 MAGICC is a licensed binary and is not redistributed in this repo. Obtain it
 from https://www.magicc.org/ (the v7.5.3 binary plus the AR6 probabilistic
@@ -80,7 +97,7 @@ On NAC it is staged at
 AR6 drawnset alongside in `magicc-dist/ar6_prob/`. Put the export in your shell
 profile or a gitignored `.env.local`.
 
-## 5. Everything else (Zenodo)
+## 6. Everything else (Zenodo)
 
 The remaining inputs are fetched from their Zenodo archives:
 

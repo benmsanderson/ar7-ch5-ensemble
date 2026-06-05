@@ -18,11 +18,13 @@ import argparse
 import sys
 from pathlib import Path
 
+from ar7_ch5.experiments.rcmip3 import run_rcmip3
 from ar7_ch5.experiments.scenariomip_cmip7 import run_scenariomip
 from ar7_ch5.experiments.sci_ensemble import run_sci_batch
 from ar7_ch5.experiments.ssp2com import run_ssp2com
 from ar7_ch5.harmonise import DEFAULT_ANCHOR_YEAR, DEFAULT_CONVERGENCE_YEAR
 from ar7_ch5.load import available_sci_scenarios, load_sci_infilled
+from ar7_ch5.load_rcmip3 import DEFAULT_DIAGNOSTICS as RCMIP3_DIAGNOSTICS
 from ar7_ch5.load_scenariomip import SCENARIOS as SCENARIOMIP_SCENARIOS
 from ar7_ch5.runners import DEFAULT_MAX_WORKERS, repo_root
 from ar7_ch5.runners.orchestrate import run_models
@@ -39,6 +41,7 @@ DEFAULT_SSP2COM_XLSX = (
 DEFAULT_SCENARIOMIP_CSV = (
     repo_root() / "data" / "scenariomip_cmip7" / "emissions_1750-2500.csv"
 )
+DEFAULT_RCMIP3_BUNDLE = repo_root() / "data" / "rcmip3_protocol"
 # Where the global history anchor lives on NAC. Other machines should set
 # AR7_HARMONISATION_HISTORY or pass --history explicitly.
 DEFAULT_HARMONISATION_HISTORY = Path(
@@ -66,10 +69,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--input",
         type=Path,
         default=None,
-        help="Path to the input file. Defaults are experiment-specific: "
-        "for 'sci' the SCI ensemble xlsx (data/SCI/...), for 'ssp2com' the "
-        "world-total xlsx (data/ssp2com/...), for 'scenariomip_cmip7' the "
-        "FaIR-inputs emissions CSV (data/scenariomip_cmip7/...).",
+        help="Path to the input file or directory. Defaults are experiment-"
+        "specific: for 'sci' the SCI ensemble xlsx (data/SCI/...), for "
+        "'ssp2com' the world-total xlsx (data/ssp2com/...), for "
+        "'scenariomip_cmip7' the FaIR-inputs emissions CSV "
+        "(data/scenariomip_cmip7/...), for 'rcmip3' the RCMIP3 protocol "
+        "bundle directory (data/rcmip3_protocol/).",
     )
     parser.add_argument(
         "--history",
@@ -158,10 +163,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.experiment == "scenariomip_cmip7":
         return _run_scenariomip(args)
 
+    if args.experiment == "rcmip3":
+        return _run_rcmip3(args)
+
     if args.experiment != "sci":
         raise SystemExit(
-            f"experiment={args.experiment!r} is not wired yet; M7 (rcmip3) "
-            "is still to come (see ar7-ch5-ensemble-brief.md)."
+            f"experiment={args.experiment!r} is not wired yet "
+            "(see ar7-ch5-ensemble-brief.md)."
         )
 
     # Fall through to the SCI path.
@@ -203,6 +211,32 @@ def main(argv: list[str] | None = None) -> int:
     result.to_csv(out_path)
     print(f"Wrote {out_path}")
 
+    _report_gsat(result)
+    return 0
+
+
+def _run_rcmip3(args) -> int:
+    """Run RCMIP3 concentration-driven scenarios through SCMs that support it."""
+    bundle = args.input or DEFAULT_RCMIP3_BUNDLE
+    out_dir = Path(args.output) / "rcmip3"
+    n_members = 200 if args.n_members is None else args.n_members
+    scenarios = (
+        [args.scenario] if args.scenario is not None
+        else list(RCMIP3_DIAGNOSTICS)
+    )
+    print(
+        f"Running RCMIP3 ({scenarios}) through {args.models} (filtered to "
+        f"concentration-driven-capable adapters) at n_members={n_members} "
+        f"-> {out_dir}."
+    )
+    result = run_rcmip3(
+        bundle,
+        models=args.models,
+        scenarios=scenarios,
+        n_members=n_members,
+        output_dir=out_dir,
+        max_workers=args.max_workers,
+    )
     _report_gsat(result)
     return 0
 
