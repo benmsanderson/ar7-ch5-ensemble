@@ -87,6 +87,36 @@ _EMISSIONS_SPECIES = (
 )
 CANONICAL_EMISSIONS = frozenset(f"Emissions|{s}" for s in _EMISSIONS_SPECIES)
 
+# Map FaIR-style variable names (used by scenariomip-paper-plots and Charlie
+# Koven's ar7_wg1_ch5) onto the adapter-canonical IAMC names this repo uses.
+# Species the FaIR convention writes but we don't drive in v1 (additional HFCs,
+# CFCs, halons) are absent; the filter to ``CANONICAL_EMISSIONS`` drops them.
+FAIR_TO_CANONICAL: dict[str, str] = {
+    "BC": "Emissions|BC",
+    "C2F6": "Emissions|C2F6",
+    "C6F14": "Emissions|C6F14",
+    "CF4": "Emissions|CF4",
+    "CH4": "Emissions|CH4",
+    "CO": "Emissions|CO",
+    "CO2 AFOLU": "Emissions|CO2|MAGICC AFOLU",
+    "CO2 FFI": "Emissions|CO2|MAGICC Fossil and Industrial",
+    "HFC-125": "Emissions|HFC125",
+    "HFC-134a": "Emissions|HFC134a",
+    "HFC-143a": "Emissions|HFC143a",
+    "HFC-227ea": "Emissions|HFC227ea",
+    "HFC-23": "Emissions|HFC23",
+    "HFC-245fa": "Emissions|HFC245fa",
+    "HFC-32": "Emissions|HFC32",
+    "HFC-4310mee": "Emissions|HFC4310mee",
+    "N2O": "Emissions|N2O",
+    "NH3": "Emissions|NH3",
+    "NOx": "Emissions|NOx",
+    "OC": "Emissions|OC",
+    "SF6": "Emissions|SF6",
+    "Sulfur": "Emissions|Sulfur",
+    "VOC": "Emissions|VOC",
+}
+
 _REQUIRED_COLUMNS = frozenset({"model", "scenario", "region", "variable", "unit"})
 
 

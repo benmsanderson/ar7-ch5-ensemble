@@ -9,7 +9,7 @@ Paths below are relative to the repo root unless stated otherwise.
 ```
 data/
   SCI/                 Scenario Compass 2025 ensemble (manual download)
-  scenariomip_cmip7/   ScenarioMIP CMIP7 baseline emissions (Zenodo)
+  scenariomip_cmip7/   ScenarioMIP CMIP7 baseline emissions (from scenariomip-paper-plots)
   ssp2com/             SSP2-COM world-total xlsx (from scenariocompass)
   rcmip3_protocol/     RCMIP3 idealised experiment definitions
   sci_csv/             preprocessed SCI CSVs (generated)
@@ -47,7 +47,27 @@ for the SCM workflow. Pre-2023 history is left to each SCM's bundle /
 historical splice; harmonisation to the 2023 history endpoint is done by the
 light global harmoniser (see `src/ar7_ch5/harmonise.py` and section 4 below for the history anchor file).
 
-## 3. MAGICC v7.5.3 binary (licensed)
+## 3. ScenarioMIP CMIP7 baseline emissions (from scenariomip-paper-plots)
+
+The seven CMIP7 baseline scenarios (VL, L, LN, M, ML, H, HL) ship as a
+single CSV in Ben Sanderson's `scenariomip-paper-plots` repository
+(github.com/benmsanderson/scenariomip-paper-plots, Zenodo 20329427).
+Drop a copy or a symlink to:
+
+    data/scenariomip_cmip7/emissions_1750-2500.csv
+
+The CSV is already harmonised and infilled by the CMIP7 pipeline, so no
+harmonisation stage runs here. Year columns are FaIR's half-year offset
+convention ("1750.5", ..., "2500.5"); the loader truncates to integer
+years and clips to `end_year` (default 2100). The same repository also
+defines the run colour / line-style / scenario-naming conventions used in
+the GMD paper -- adopt those for any Ch5 figure that shows these
+scenarios.
+
+SSP2-COM, the eighth scenario the chapter reports alongside these seven,
+is sourced separately from scenariocompass (see section 2).
+
+## 4. MAGICC v7.5.3 binary (licensed)
 
 MAGICC is a licensed binary and is not redistributed in this repo. Obtain it
 from https://www.magicc.org/ (the v7.5.3 binary plus the AR6 probabilistic
@@ -60,12 +80,10 @@ On NAC it is staged at
 AR6 drawnset alongside in `magicc-dist/ar6_prob/`. Put the export in your shell
 profile or a gitignored `.env.local`.
 
-## 4. Everything else (Zenodo)
+## 5. Everything else (Zenodo)
 
 The remaining inputs are fetched from their Zenodo archives:
 
-- ScenarioMIP CMIP7 emissions and figure styling: scenariomip-paper-plots,
-  Zenodo 20329427.
 - FaIR 2.x calibration: Zenodo 18828694.
 - Global harmonisation history anchor (52 species, World, 1750-2023), used by
   the light SSP2-COM harmoniser: Zenodo 17845154. On NAC this is already
