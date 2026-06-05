@@ -18,10 +18,12 @@ import argparse
 import sys
 from pathlib import Path
 
+from ar7_ch5.experiments.scenariomip_cmip7 import run_scenariomip
 from ar7_ch5.experiments.sci_ensemble import run_sci_batch
 from ar7_ch5.experiments.ssp2com import run_ssp2com
 from ar7_ch5.harmonise import DEFAULT_ANCHOR_YEAR, DEFAULT_CONVERGENCE_YEAR
 from ar7_ch5.load import available_sci_scenarios, load_sci_infilled
+from ar7_ch5.load_scenariomip import SCENARIOS as SCENARIOMIP_SCENARIOS
 from ar7_ch5.runners import DEFAULT_MAX_WORKERS, repo_root
 from ar7_ch5.runners.orchestrate import run_models
 
@@ -33,6 +35,9 @@ DEFAULT_SCI_XLSX = (
 )
 DEFAULT_SSP2COM_XLSX = (
     repo_root() / "data" / "ssp2com" / "ssp2-com_world_total.xlsx"
+)
+DEFAULT_SCENARIOMIP_CSV = (
+    repo_root() / "data" / "scenariomip_cmip7" / "emissions_1750-2500.csv"
 )
 # Where the global history anchor lives on NAC. Other machines should set
 # AR7_HARMONISATION_HISTORY or pass --history explicitly.
@@ -63,7 +68,8 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Path to the input file. Defaults are experiment-specific: "
         "for 'sci' the SCI ensemble xlsx (data/SCI/...), for 'ssp2com' the "
-        "world-total xlsx (data/ssp2com/...).",
+        "world-total xlsx (data/ssp2com/...), for 'scenariomip_cmip7' the "
+        "FaIR-inputs emissions CSV (data/scenariomip_cmip7/...).",
     )
     parser.add_argument(
         "--history",
@@ -149,10 +155,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.experiment == "ssp2com":
         return _run_ssp2com(args)
 
+    if args.experiment == "scenariomip_cmip7":
+        return _run_scenariomip(args)
+
     if args.experiment != "sci":
         raise SystemExit(
-            f"experiment={args.experiment!r} is not wired yet; M6 (scenariomip_cmip7) "
-            "and M7 (rcmip3) are still to come (see ar7-ch5-ensemble-brief.md)."
+            f"experiment={args.experiment!r} is not wired yet; M7 (rcmip3) "
+            "is still to come (see ar7-ch5-ensemble-brief.md)."
         )
 
     # Fall through to the SCI path.
@@ -194,6 +203,32 @@ def main(argv: list[str] | None = None) -> int:
     result.to_csv(out_path)
     print(f"Wrote {out_path}")
 
+    _report_gsat(result)
+    return 0
+
+
+def _run_scenariomip(args) -> int:
+    """Run the seven ScenarioMIP CMIP7 baseline scenarios through ``--models``."""
+    csv = args.input or DEFAULT_SCENARIOMIP_CSV
+    out_dir = Path(args.output) / "scenariomip_cmip7"
+    n_members = 200 if args.n_members is None else args.n_members
+    # --scenario can pin to a subset; reuses the existing SCI flag.
+    scenarios = (
+        [args.scenario] if args.scenario is not None
+        else list(SCENARIOMIP_SCENARIOS)
+    )
+    print(
+        f"Running ScenarioMIP CMIP7 ({scenarios}) through {args.models} at "
+        f"n_members={n_members} -> {out_dir} (one NetCDF per (scenario, SCM))."
+    )
+    result = run_scenariomip(
+        csv,
+        models=args.models,
+        scenarios=scenarios,
+        n_members=n_members,
+        output_dir=out_dir,
+        max_workers=args.max_workers,
+    )
     _report_gsat(result)
     return 0
 
