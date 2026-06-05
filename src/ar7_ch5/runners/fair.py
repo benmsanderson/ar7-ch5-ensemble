@@ -13,7 +13,11 @@ from collections.abc import Iterable, Sequence
 from openscm_runner import RunMode
 from openscm_runner.adapters import FAIR2
 
-from . import DEFAULT_OUTPUT_VARIABLES, resolve_fair_calibration
+from . import (
+    DEFAULT_OUTPUT_VARIABLES,
+    resolve_fair_calibration,
+    resolve_rcmip3_bundle,
+)
 
 
 def build_fair2(
@@ -36,6 +40,7 @@ def build_fair2(
     """
     return FAIR2.from_native_distribution(
         resolve_fair_calibration(),
+        resolve_rcmip3_bundle(),
         mode=mode,
         member_indices=member_indices,
         output_variables=tuple(output_variables),

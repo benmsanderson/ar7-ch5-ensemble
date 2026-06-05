@@ -65,6 +65,29 @@ def resolve_ciceroscm_calibration() -> Path:
     return _calibration_dir() / "ciceroscm-rcmip3-v1.0.0"
 
 
+def resolve_rcmip3_bundle() -> Path:
+    """Path to the RCMIP Phase 3 protocol bundle (Zenodo 20430630).
+
+    The upstream FaIR2 and CICEROSCMPY2 adapters require this bundle for
+    the historical splice, the natural forcings (solar + volcanic), and
+    the land-use forcing trajectory for every scenario. Our loaders
+    rewrite ``scenario`` to a canonical RCMIP3 name (see
+    :mod:`ar7_ch5._rcmip3_naming`) so the bundle's matching row supplies
+    those inputs; ``pathway_id`` preserves the chapter identity. See
+    ``docs/engine_upstream_switch.md``.
+
+    Override with ``AR7_RCMIP3_BUNDLE``; otherwise look under the staged
+    NAC location, or the in-repo ``data/rcmip3_protocol/`` if present.
+    """
+    env = os.environ.get("AR7_RCMIP3_BUNDLE")
+    if env:
+        return Path(env)
+    in_repo = repo_root() / "data" / "rcmip3_protocol"
+    if in_repo.is_dir():
+        return in_repo
+    return Path("/storage/no-backup-nac/users/bensan/rcmip3_protocol")
+
+
 def resolve_magicc_drawnset() -> Path:
     """Path to the MAGICC AR6 probabilistic drawnset JSON.
 
