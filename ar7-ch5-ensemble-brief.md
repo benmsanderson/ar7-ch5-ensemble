@@ -381,3 +381,18 @@ fork as the engine.
    filter auto-includes MAGICC as soon as the adapter gains
    concentration-driven support, with no further changes required
    here.
+
+## 12. Backlog (not yet a milestone)
+
+1. **SSP2-COM long-tail extension via FLEX.** SSP2-COM's source data
+   ends at 2100, so on `fig05` / `fig06` it sits as a short trace
+   while the ScenarioMIP CMIP7 pathways extend to 2500 (see the
+   `PATHWAY_MAX_YEAR` clip in
+   `notebooks/fig06_per_scm_grid.py`). Build a proper extension
+   trajectory using the `FLEX` repo's ScenarioMIP-extensions pipeline
+   (github.com/benmsanderson/FLEX, currently on branch
+   `egu2026_talk` -- wait for that branch to land on `main` before
+   importing). Once landed, run SSP2-COM with the extension applied
+   so its 2100-2500 segment is a real chapter scenario rather than
+   bundle-donor (ssp245) extrapolation, and drop the `SSP2-com`
+   entry from `PATHWAY_MAX_YEAR`.
