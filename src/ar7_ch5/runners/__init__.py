@@ -32,11 +32,25 @@ MODEL_NAMES: tuple[str, ...] = ("fair", "ciceroscm", "magicc")
 
 # Cap on worker processes per model run. CICERO-SCM and MAGICC each fork a
 # ProcessPoolExecutor that otherwise defaults to ``cpu_count()`` (256 logical
-# cores on NAC). Models run one at a time, so this is also the total concurrent
-# worker count. Kept modest because NAC enforces strict memory overcommit
+# cores on NAC). NAC enforces strict memory overcommit
 # (``vm.overcommit_memory=2``): every fork must reserve commit equal to the
 # parent's virtual size, and hundreds of workers exhaust the commit headroom.
 DEFAULT_MAX_WORKERS: int = 12
+
+# Per-SCM worker defaults for concurrent dispatch (see
+# ``ar7_ch5.runners.orchestrate.PER_SCM_DEFAULT_WORKERS`` for the table that
+# experiments use). FaIR is in-process and ignores ``max_workers``.
+# CICERO-SCM is the slowest of the three; giving it 32 workers brings its
+# per-pathway time down to ~27 s alone (was 25 s sequential). MAGICC at 12
+# workers is competitive with 24 once CPU contention from CICERO is
+# present, so 12 is the right concurrent-dispatch budget. Benchmarks
+# (bench_magicc_contention) show C32+M12 concurrent dispatch beating
+# sequential 24w by ~2x on the per-pathway wall clock.
+PER_SCM_DEFAULT_WORKERS: dict[str, int | None] = {
+    "fair":      None,
+    "ciceroscm": 32,
+    "magicc":    12,
+}
 
 
 def repo_root() -> Path:
