@@ -73,11 +73,13 @@ GMD_PATHWAY_COLORS = {
 }
 
 # SCM -> line style. FaIR gets a solid line + the 5-95% band (it is the
-# GMD reference). CICERO and MAGICC are overlaid as median-only lines.
+# GMD reference). CICERO long-dashes, MAGICC dash-dot. We avoid the
+# bare dotted style here because matplotlib renders ":" as very small
+# dots that disappear under a 5-95% band at the chapter's default DPI.
 SCM_LINESTYLES = {
     "fair":      "-",
-    "ciceroscm": "--",
-    "magicc":    ":",
+    "ciceroscm": (0, (6, 3)),       # long dashes
+    "magicc":    (0, (4, 1.5, 1, 1.5)),  # dash-dot-dot
 }
 
 DEFAULT_GMD_GWP_CSV = Path(
@@ -381,15 +383,24 @@ def _draw_scm_panel(
     *, anomaly_baseline: tuple[int, int] | None = None,
     ymax: float | None = None,
 ) -> None:
-    """SCM panel: per (scm, pathway), 5-95 band for fair, median lines all."""
+    """SCM panel: 5-95 band for fair, median lines for all three.
+
+    Drawing order matters: paint all FaIR bands first (so they sit at
+    the bottom), then all median lines on top. Otherwise a later
+    pathway's band overlays the earlier pathway's dotted/dashed
+    medians and the SCM-line distinction visually collapses.
+    """
+    # Cache per-(scm, pathway) quantiles so we don't read each NC twice.
+    cache: dict[tuple[str, str], pd.DataFrame | None] = {}
     for pathway in pathways:
-        col = GMD_PATHWAY_COLORS[pathway]
         for scm in models:
             q = _load_scm_quantiles(scm, pathway, variable_long)
             if q is None:
+                cache[(scm, pathway)] = None
                 continue
             years = [y for y in q.index if y <= PLOT_END]
             if not years:
+                cache[(scm, pathway)] = None
                 continue
             qs = q.loc[years]
             if anomaly_baseline is not None:
@@ -400,16 +411,50 @@ def _draw_scm_panel(
                 if ref_years:
                     ref = q.loc[ref_years, 0.5].mean()
                     qs = qs - ref
-            if scm == "fair":
-                ax.fill_between(
-                    years, qs[0.05].values, qs[0.95].values,
-                    color=col, alpha=0.22, lw=0,
-                )
+            cache[(scm, pathway)] = qs
+
+    # Bands first (FaIR only).
+    for pathway in pathways:
+        qs = cache.get(("fair", pathway))
+        if qs is None:
+            continue
+        col = GMD_PATHWAY_COLORS[pathway]
+        ax.fill_between(
+            qs.index, qs[0.05].values, qs[0.95].values,
+            color=col, alpha=0.22, lw=0,
+        )
+    # Medians second, all SCMs. Bottom-to-top draw order:
+    # fair (solid, in band), then ciceroscm (long dashes),
+    # then magicc (dash-dot, thickest -- it stops at 2100 so needs to
+    # punch through the early years where all three SCMs co-locate).
+    scm_visual = {
+        "fair":      {"lw": 1.6, "alpha": 0.95},
+        "ciceroscm": {"lw": 1.3, "alpha": 0.95},
+        "magicc":    {"lw": 1.7, "alpha": 1.0},
+    }
+    for scm in models:
+        for pathway in pathways:
+            qs = cache.get((scm, pathway))
+            if qs is None:
+                continue
+            col = GMD_PATHWAY_COLORS[pathway]
+            kwargs = scm_visual.get(scm, {"lw": 1.3, "alpha": 0.95})
             ax.plot(
-                years, qs[0.5].values,
-                color=col, lw=1.6 if scm == "fair" else 1.2,
-                linestyle=SCM_LINESTYLES[scm], alpha=0.95,
+                qs.index, qs[0.5].values,
+                color=col, linestyle=SCM_LINESTYLES[scm],
+                **kwargs,
             )
+            # MAGICC ends at 2100. Mark its endpoint with a filled
+            # circle so the reader can see where it stopped before
+            # FaIR + CICERO extend into the long tail.
+            if scm == "magicc":
+                end_year = int(qs.index.max())
+                ax.plot(
+                    [end_year], [qs.loc[end_year, 0.5]],
+                    marker="o", markersize=4, color=col,
+                    markeredgecolor="white", markeredgewidth=0.6,
+                    linestyle="none",
+                )
     ax.set_ylabel(ylabel)
     ax.axhline(0, ls=":", color="k", lw=0.5)
     ax.grid(True, alpha=0.3)
@@ -444,12 +489,14 @@ ax[7].set_title("(h) surface air temperature anomaly", loc="left", fontsize=10)
 SCM_LABELS = {
     "fair":      "FaIR (median + 5-95% band)",
     "ciceroscm": "CICERO-SCM (median)",
-    "magicc":    "MAGICC (median)",
+    "magicc":    "MAGICC (median; ends at 2100)",
 }
 scm_handles = [
     plt.Line2D(
-        [], [], color="k", lw=1.6 if scm == "fair" else 1.2,
+        [], [], color="k", lw=1.6 if scm == "fair" else 1.3,
         linestyle=SCM_LINESTYLES[scm], label=SCM_LABELS.get(scm, scm),
+        marker="o" if scm == "magicc" else None, markersize=4,
+        markeredgecolor="white",
     )
     for scm in models
 ]
