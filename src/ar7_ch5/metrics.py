@@ -16,8 +16,15 @@ parameter; see ``project_classification_warming_contract``):
   own assessment-period match), then quantiles taken across the union of
   members across all climate_models. Widens the spread relative to B1.
 
-Inputs are the NetCDFs written by :func:`ar7_ch5.experiments.sci_ensemble.run_sci_batch`
-under ``<outputs_dir>/<scm>/sci_<iam>_<pathway_id>.nc``.
+Inputs are the per-pathway NetCDFs written by the per-experiment runners.
+The chapter has three input sets selected by :data:`InputSource`:
+
+- ``"sci"`` (default): SCI ensemble batch -- ``sci_<iam>_<pathway_id>.nc``.
+  Pathway identity is the ``(iam, pathway_id)`` pair.
+- ``"scenariomip"``: ScenarioMIP CMIP7 baselines --
+  ``scenariomip_<pathway_id>.nc`` (one pathway per file; no IAM dimension).
+- ``"ssp2com"``: SSP2-COM world-total -- ``ssp2com_<pathway_id>.nc`` (one
+  pathway per file; no IAM dimension).
 """
 
 from __future__ import annotations
@@ -33,6 +40,9 @@ from pandas_openscm.grouping import (
     fix_index_name_after_groupby_quantile,
     groupby_except,
 )
+
+InputSource = Literal["sci", "scenariomip", "ssp2com"]
+_INPUT_SOURCES: tuple[str, ...] = ("sci", "scenariomip", "ssp2com")
 
 GSAT_VARIABLE = "Surface Air Temperature Change"
 
@@ -52,23 +62,43 @@ _ANCHOR_GROUP_COLS = ["climate_model", "model", "pathway_id"]
 Source = Literal["per_model", "pooled"]
 
 
-def pathway_nc_name(iam: str, pathway_id: str) -> str:
-    """Match the filename convention written by run_sci_batch.
+def pathway_nc_name(
+    iam: str | None, pathway_id: str, *, input_source: InputSource = "sci",
+) -> str:
+    """Match the filename convention written by the per-experiment runners.
 
     Keys on the chapter ``pathway_id`` (e.g. ``SSP1-19``) rather than the
     canonical RCMIP3 ``scenario`` (e.g. ``ssp119``), because multiple
     pathways can share a canonical and would clobber a scenario-keyed
     filename. See ``docs/engine_upstream_switch.md``.
+
+    For ``input_source="sci"`` the stem includes the IAM
+    (``sci_<iam>_<pathway_id>``); ScenarioMIP CMIP7 and SSP2-COM have
+    only one pathway per identifier and omit the IAM
+    (``scenariomip_<pathway_id>`` / ``ssp2com_<pathway_id>``).
     """
-    stem = f"sci_{iam}_{pathway_id}".replace("/", "-").replace(" ", "-")
-    return f"{stem}.nc"
+    if input_source == "sci":
+        if iam is None:
+            raise ValueError("SCI filename requires an iam; got None.")
+        stem = f"sci_{iam}_{pathway_id}"
+    elif input_source == "scenariomip":
+        stem = f"scenariomip_{pathway_id}"
+    elif input_source == "ssp2com":
+        stem = f"ssp2com_{pathway_id}"
+    else:
+        raise ValueError(
+            f"unknown input_source={input_source!r}; "
+            f"expected one of {_INPUT_SOURCES}."
+        )
+    return f"{stem.replace('/', '-').replace(' ', '-')}.nc"
 
 
 def load_pathway_outputs(
-    pathways: Iterable[tuple[str, str]],
+    pathways: Iterable[tuple[str | None, str]],
     models: Sequence[str],
     outputs_dir: str | Path,
     *,
+    input_source: InputSource = "sci",
     variable: str = GSAT_VARIABLE,
     region: str = "World",
 ) -> pd.DataFrame:
@@ -77,13 +107,18 @@ def load_pathway_outputs(
     Parameters
     ----------
     pathways
-        Iterable of ``(iam, pathway_id)`` pairs to load (chapter
-        identifiers, e.g. ``("AIM/CGE 2.0", "SSP1-19")``).
+        Iterable of ``(iam, pathway_id)`` pairs (chapter identifiers).
+        For ``input_source="sci"`` both are populated (e.g.
+        ``("AIM/CGE 2.0", "SSP1-19")``). For ScenarioMIP CMIP7 / SSP2-COM
+        the ``iam`` slot is ignored (typically ``None``); the
+        ``pathway_id`` alone keys the NetCDF.
     models
         SCM subdirectory names under ``outputs_dir``
         (``"fair", "ciceroscm", "magicc"``).
     outputs_dir
         Root of the per-model NetCDF tree (``<outputs_dir>/<scm>/<file>.nc``).
+    input_source
+        Filename convention selector. See :data:`InputSource`.
     variable
         Variable to keep. Default GSAT.
     region
@@ -98,10 +133,14 @@ def load_pathway_outputs(
     """
     out_dir = Path(outputs_dir)
     pieces: list[pd.DataFrame] = []
-    missing: list[tuple[str, str, str]] = []
+    missing: list[tuple[str, str | None, str]] = []
     for iam, pathway_id in pathways:
+        nc_name = pathway_nc_name(iam, pathway_id, input_source=input_source)
+        # For non-SCI input sets we don't carry an IAM; group key uses the
+        # input_source name so cross-source merges stay distinguishable.
+        model_key = iam if input_source == "sci" else input_source
         for scm in models:
-            path = out_dir / scm / pathway_nc_name(iam, pathway_id)
+            path = out_dir / scm / nc_name
             if not path.is_file():
                 missing.append((scm, iam, pathway_id))
                 continue
@@ -115,13 +154,18 @@ def load_pathway_outputs(
             # meta carry through (FaIR drops them, CICERO mirrors scenario
             # into both, MAGICC preserves them). Overwrite from the input
             # pair so all SCMs share the same (model, pathway_id) group key.
-            ts = _set_index_level(ts, "model", iam)
+            ts = _set_index_level(ts, "model", model_key)
             ts = _set_index_level(ts, "pathway_id", pathway_id)
+            # Canonicalise the level order so pd.concat across pieces with
+            # heterogeneous source schemas (e.g. legacy NCs that predate
+            # pathway_id) aligns by name rather than by position.
+            ts = _sort_index_levels(ts)
             pieces.append(ts)
 
     if not pieces:
         raise FileNotFoundError(
-            f"No SCM output NetCDFs found under {out_dir} for {list(pathways)}."
+            f"No SCM output NetCDFs found under {out_dir} for "
+            f"{list(pathways)} (input_source={input_source!r})."
         )
     if missing:
         # Don't crash if a single SCM is missing for some pathways: the
@@ -132,6 +176,14 @@ def load_pathway_outputs(
             f"under {out_dir} (first 3: {missing[:3]})."
         )
     return pd.concat(pieces)
+
+
+def _sort_index_levels(df: pd.DataFrame) -> pd.DataFrame:
+    """Reorder MultiIndex levels alphabetically so pieces concat consistently."""
+    target = sorted(df.index.names)
+    if list(df.index.names) == target:
+        return df
+    return df.reorder_levels(target)
 
 
 def _set_index_level(df: pd.DataFrame, level: str, value: str) -> pd.DataFrame:
@@ -200,6 +252,7 @@ def compute_warming_metrics(
     *,
     source: Source = "per_model",
     quantiles: Sequence[float] = CLASSIFICATION_QUANTILES,
+    year_end: int = 2100,
 ) -> pd.DataFrame:
     """Peak and end-of-century warming at the requested quantiles.
 
@@ -212,6 +265,14 @@ def compute_warming_metrics(
     quantiles
         Quantiles to evaluate. Must include 0.5 and 0.67 for the GW0-GW8
         classification.
+    year_end
+        Upper bound (inclusive) for the peak-warming search. Default 2100
+        matches the AR6 / Riahi 2026 chapter horizon and the xlsx
+        regression path. Important when an SCM's NetCDF extends past the
+        chapter scenario's emissions horizon (CICERO-SCM extends every
+        run to 2500 by filling missing emissions from the bundle donor
+        scenario; classifying against that extension is misleading for
+        scenarios whose emissions only go to 2100).
 
     Returns
     -------
@@ -231,7 +292,10 @@ def compute_warming_metrics(
 
     groupby_except_levels, index_levels = _quantile_levels(source)
 
-    peak = anchored_temperatures.max(axis="columns")
+    # Restrict to <= year_end before peak search (see year_end docstring).
+    year_cols = [c for c in anchored_temperatures.columns if c <= year_end]
+    in_range = anchored_temperatures[year_cols]
+    peak = in_range.max(axis="columns")
     eoc = anchored_temperatures[2100]
 
     peak_q = fix_index_name_after_groupby_quantile(
@@ -294,11 +358,12 @@ def _declining_from_median_ts(
 
 
 def warming_metrics_from_outputs(
-    pathways: Iterable[tuple[str, str]],
+    pathways: Iterable[tuple[str | None, str]],
     models: Sequence[str],
     outputs_dir: str | Path,
     *,
     source: Source = "per_model",
+    input_source: InputSource = "sci",
     quantiles: Sequence[float] = CLASSIFICATION_QUANTILES,
     assessment_median: float = AR6_ASSESSMENT_MEDIAN,
     assessment_period: Sequence[int] = AR6_ASSESSMENT_PERIOD,
@@ -308,13 +373,22 @@ def warming_metrics_from_outputs(
     """End-to-end: load NetCDFs, anchor to assessment, return metrics frame.
 
     Thin convenience over :func:`load_pathway_outputs`,
-    :func:`anchor_to_assessment`, and :func:`compute_warming_metrics`.
+    :func:`anchor_to_assessment`, and :func:`compute_warming_metrics`. The
+    two axes are orthogonal: ``input_source`` selects the input dataset
+    (SCI / ScenarioMIP CMIP7 / SSP2-COM) and ``source`` selects the multi-
+    SCM aggregation (``per_model`` vs ``pooled``).
     """
-    raw = load_pathway_outputs(pathways, models, outputs_dir, region=region)
+    raw = load_pathway_outputs(
+        pathways, models, outputs_dir,
+        input_source=input_source, region=region,
+    )
     anchored = anchor_to_assessment(
         raw,
         assessment_median=assessment_median,
         assessment_period=assessment_period,
         pre_industrial_period=pre_industrial_period,
     )
+    # Default ``year_end=2100`` matches the chapter horizon and matches the
+    # xlsx regression path; pass an explicit ``year_end`` if a future
+    # caller wants the long tail.
     return compute_warming_metrics(anchored, source=source, quantiles=quantiles)
