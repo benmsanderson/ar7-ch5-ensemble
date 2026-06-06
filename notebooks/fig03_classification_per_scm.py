@@ -2,13 +2,20 @@
 # # Figure 03 - GW0-GW8 warming classification per SCM
 #
 # Cross-source summary of the chapter's per-SCM warming classification.
-# Three columns, one per chapter input set; per column a stacked bar per
-# SCM (plus an xlsx-MAGICC reference stack for SCI) showing how many
-# pathways land in each Riahi 2026 (Table SI.3) GW category.
 #
-# The SCMs see identical input emissions; the per-stack spread is the
-# chapter's three-SCM ensemble value-add over the SCI-vintage MAGICC-only
-# baseline.
+# - Left panel: SCI per-SCM stacked bars (4 stacks side by side --
+#   xlsx-MAGICC regression reference, FaIR, CICERO, MAGICC -- each
+#   stack a tally of how many of the 330 vetted SCI pathways land in
+#   each Riahi 2026 (Table SI.3) GW category).
+# - Right panel: 3 (SCM) x 8 (pathway) coloured grid covering the
+#   ScenarioMIP CMIP7 baselines (VL, L, LN, M, ML, H, HL) and SSP2-COM.
+#   Each cell coloured by GW category; text shows the GW short id and
+#   the median end-of-century warming in K. Pathways ordered by mean
+#   EoC warming across SCMs (cold left -> hot right).
+#
+# The SCMs see identical input emissions; the per-stack / per-cell
+# spread is the chapter's three-SCM ensemble value-add over the
+# SCI-vintage MAGICC-only baseline.
 #
 # Inputs (all produced by `scripts/classify.py`):
 #
@@ -41,8 +48,8 @@ from ar7_ch5.runners import repo_root
 
 FIGURE_ID = "fig03_classification_per_scm"
 
-# Per-stack ordering: SCI gets an xlsx-MAGICC baseline plus the three
-# SCMs (4 stacks); ScenarioMIP and SSP2-COM get just the three SCMs.
+# Per-stack ordering for the SCI panel: xlsx-MAGICC baseline plus the
+# three SCMs.
 SCM_DISPLAY_ORDER = ["xlsx-MAGICC", "FaIRv2.2.4", "CICERO-SCM-PY2.1.2", "MAGICCv7.5.3"]
 SCM_SHORT_LABELS = {
     "xlsx-MAGICC":        "xlsx-MAGICC",
@@ -105,12 +112,26 @@ def _stack_counts_sci() -> pd.DataFrame:
     return per_scm[ordered]
 
 
-def _stack_counts_simple(csv_path: Path) -> pd.DataFrame:
-    """Per-SCM counts for ScenarioMIP / SSP2-COM (no vetting; classification only)."""
-    df = pd.read_csv(csv_path)
-    counts = _counts_per_stack(df, "climate_model")
-    ordered = [c for c in SCM_DISPLAY_ORDER if c in counts.columns]
-    return counts[ordered]
+def _per_pathway_grid(*csv_paths: Path) -> pd.DataFrame:
+    """Long DataFrame combining ScenarioMIP CMIP7 + SSP2-COM classifications.
+
+    Returns rows of (climate_model, Scenario, category, eoc_warming_50).
+    Only includes CSVs that exist on disk. Used for the per-pathway grid
+    on the right of fig03.
+    """
+    pieces: list[pd.DataFrame] = []
+    for p in csv_paths:
+        if not p.is_file():
+            continue
+        df = pd.read_csv(p)[
+            ["climate_model", "Scenario", "category", "eoc_warming_50"]
+        ].copy()
+        pieces.append(df)
+    if not pieces:
+        return pd.DataFrame(
+            columns=["climate_model", "Scenario", "category", "eoc_warming_50"]
+        )
+    return pd.concat(pieces, ignore_index=True)
 
 
 def _draw_stacks(
@@ -153,6 +174,68 @@ def _draw_stacks(
     ax.spines["right"].set_visible(False)
 
 
+def _draw_pathway_grid(
+    ax, df: pd.DataFrame, *,
+    scm_order: list[str], palette: dict[str, str],
+) -> None:
+    """3 x n_pathway colour grid; cells coloured by GW category.
+
+    Each cell shows the category short id and the median EoC warming.
+    Pathways are ordered ascending by mean EoC warming across SCMs.
+    """
+    pathway_order = (
+        df.groupby("Scenario", observed=True)["eoc_warming_50"]
+        .mean().sort_values().index.tolist()
+    )
+    cat_grid = df.pivot(
+        index="climate_model", columns="Scenario", values="category",
+    ).reindex(index=scm_order, columns=pathway_order)
+    eoc_grid = df.pivot(
+        index="climate_model", columns="Scenario", values="eoc_warming_50",
+    ).reindex(index=scm_order, columns=pathway_order)
+
+    for i in range(len(scm_order)):
+        for j in range(len(pathway_order)):
+            category = cat_grid.iat[i, j]
+            colour = palette.get(category, "#dddddd")
+            ax.add_patch(plt.Rectangle(
+                (j, len(scm_order) - 1 - i), 1, 1,
+                facecolor=colour, edgecolor="white", linewidth=1.0,
+            ))
+            eoc = eoc_grid.iat[i, j]
+            # GW4 / GW5 (yellow / orange) read better with black text;
+            # the darker GW0-GW3 and GW6-GW8 cells get white text.
+            light_cats = {"GW4", "GW5", "unclassified"}
+            text_colour = "black" if category in light_cats else "white"
+            ax.text(
+                j + 0.5, len(scm_order) - 1 - i + 0.5,
+                f"{category}\n{eoc:.1f} K",
+                ha="center", va="center",
+                fontsize=8, color=text_colour, weight="bold",
+            )
+
+    ax.set_xlim(0, len(pathway_order))
+    ax.set_ylim(0, len(scm_order))
+    ax.set_aspect("equal")
+    ax.set_xticks(np.arange(len(pathway_order)) + 0.5)
+    ax.set_xticklabels(pathway_order, rotation=30, ha="right", fontsize=9)
+    ax.set_yticks(np.arange(len(scm_order)) + 0.5)
+    ax.set_yticklabels(
+        [SCM_SHORT_LABELS.get(s, s) for s in reversed(scm_order)],
+        fontsize=9,
+    )
+    ax.set_title(
+        "ScenarioMIP CMIP7 + SSP2-COM per (SCM, pathway)",
+        fontsize=11, loc="left",
+    )
+    for spine in ("top", "right", "left", "bottom"):
+        ax.spines[spine].set_visible(False)
+    ax.tick_params(length=0)
+
+
+SCM_GRID_ORDER = ["FaIRv2.2.4", "CICERO-SCM-PY2.1.2", "MAGICCv7.5.3"]
+
+
 # %% [markdown]
 # ## Load + tally
 
@@ -164,27 +247,21 @@ print(sci_counts.to_string())
 scenariomip_csv = (
     repo_root() / "outputs" / "classification_per_model_scenariomip.csv"
 )
-if scenariomip_csv.is_file():
-    scenariomip_counts = _stack_counts_simple(scenariomip_csv)
-    print("\nScenarioMIP per-stack counts:")
-    print(scenariomip_counts.to_string())
-else:
-    scenariomip_counts = None
-    print(
-        "\nWARNING: ScenarioMIP CSV missing. Generate with:\n"
-        "  pixi run python scripts/classify.py "
-        "--source per_model --input-source scenariomip"
-    )
-
 ssp2com_csv = repo_root() / "outputs" / "classification_per_model_ssp2com.csv"
-if ssp2com_csv.is_file():
-    ssp2com_counts = _stack_counts_simple(ssp2com_csv)
-    print("\nSSP2-COM per-stack counts:")
-    print(ssp2com_counts.to_string())
-else:
-    ssp2com_counts = None
+
+# Combined per-pathway frame for the right panel.
+per_pathway = _per_pathway_grid(scenariomip_csv, ssp2com_csv)
+if not per_pathway.empty:
     print(
-        "\nWARNING: SSP2-COM CSV missing. Generate with:\n"
+        f"\nPer-pathway grid (ScenarioMIP CMIP7 + SSP2-COM): "
+        f"{per_pathway['Scenario'].nunique()} pathways "
+        f"x {per_pathway['climate_model'].nunique()} SCMs."
+    )
+else:
+    print(
+        "\nWARNING: ScenarioMIP / SSP2-COM CSVs missing. Generate with:\n"
+        "  pixi run python scripts/classify.py "
+        "--source per_model --input-source scenariomip\n"
         "  pixi run python scripts/classify.py "
         "--source per_model --input-source ssp2com"
     )
@@ -194,42 +271,41 @@ else:
 # ## Plot
 
 # %%
-n_panels = 1 + (scenariomip_counts is not None) + (ssp2com_counts is not None)
-width_ratios = []
-sources_to_plot = []
-sources_to_plot.append(("SCI (vetted, 330 pathways)", sci_counts))
-width_ratios.append(len(sci_counts.columns))
-if scenariomip_counts is not None:
-    sources_to_plot.append(("ScenarioMIP CMIP7 (7 pathways)", scenariomip_counts))
-    width_ratios.append(len(scenariomip_counts.columns))
-if ssp2com_counts is not None:
-    sources_to_plot.append(("SSP2-COM (1 pathway)", ssp2com_counts))
-    width_ratios.append(len(ssp2com_counts.columns))
+has_grid = not per_pathway.empty
+n_grid_pathways = per_pathway["Scenario"].nunique() if has_grid else 0
 
-# Scale figure width to the total number of stacks across panels.
-fig_width = 2.0 + 1.4 * sum(width_ratios)
-fig, axes = plt.subplots(
-    nrows=1, ncols=n_panels,
-    figsize=(fig_width, 5.2),
-    gridspec_kw={"width_ratios": width_ratios},
-)
-if n_panels == 1:
-    axes = [axes]
-
-for idx, ((title, counts), ax) in enumerate(zip(sources_to_plot, axes, strict=True)):
-    _draw_stacks(
-        ax, counts, title=title, palette=style.gw_colors,
-        show_category_legend=(idx == 0),
+if has_grid:
+    width_ratios = [len(sci_counts.columns), n_grid_pathways]
+    fig_width = 2.0 + 1.4 * sum(width_ratios)
+    fig, (ax_sci, ax_grid) = plt.subplots(
+        nrows=1, ncols=2,
+        figsize=(fig_width, 5.8),
+        gridspec_kw={"width_ratios": width_ratios},
     )
-    if idx == 0:
-        ax.set_ylabel("Number of pathways")
+else:
+    fig, ax_sci = plt.subplots(
+        nrows=1, ncols=1,
+        figsize=(2.0 + 1.4 * len(sci_counts.columns), 5.2),
+    )
+
+_draw_stacks(
+    ax_sci, sci_counts,
+    title="SCI (vetted, 330 pathways)",
+    palette=style.gw_colors,
+    show_category_legend=True,
+)
+ax_sci.set_ylabel("Number of pathways")
+
+if has_grid:
+    _draw_pathway_grid(
+        ax_grid, per_pathway,
+        scm_order=SCM_GRID_ORDER, palette=style.gw_colors,
+    )
 
 # Shared GW-category legend at the figure level. matplotlib only honours
 # label= on artists drawn on the axis we call .legend() on, so pull
-# handles+labels from the first panel and place them on the figure
-# instead. Reserve right-edge space via tight_layout's rect so the
-# legend doesn't clip.
-handles, labels = axes[0].get_legend_handles_labels()
+# handles+labels from the SCI stack and place them on the figure.
+handles, labels = ax_sci.get_legend_handles_labels()
 fig.legend(
     handles, labels,
     title="GW category (Riahi 2026 SI.3)",
@@ -237,11 +313,8 @@ fig.legend(
     fontsize=8, frameon=False, title_fontsize=9,
 )
 
-fig.suptitle(
-    cfg.get("title", FIGURE_ID),
-    fontsize=12,
-)
-fig.tight_layout(rect=(0, 0, 0.92, 0.97))
+fig.suptitle(cfg.get("title", FIGURE_ID), fontsize=12)
+fig.tight_layout(rect=(0, 0, 0.92, 0.96))
 
 
 # %% [markdown]
