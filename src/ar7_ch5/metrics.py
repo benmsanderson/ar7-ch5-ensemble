@@ -80,7 +80,8 @@ def load_pathway_outputs(
         Iterable of ``(iam, pathway_id)`` pairs to load (chapter
         identifiers, e.g. ``("AIM/CGE 2.0", "SSP1-19")``).
     models
-        SCM subdirectory names under ``outputs_dir`` (``"fair", "ciceroscm", "magicc"``).
+        SCM subdirectory names under ``outputs_dir``
+        (``"fair", "ciceroscm", "magicc"``).
     outputs_dir
         Root of the per-model NetCDF tree (``<outputs_dir>/<scm>/<file>.nc``).
     variable
@@ -244,7 +245,9 @@ def compute_warming_metrics(
 
     # Per-year median timeseries; used to assess whether warming is still
     # declining at end-of-century (median 2100 < median 2090).
-    median_ts = groupby_except(anchored_temperatures, groupby_except_levels).quantile(0.5)
+    median_ts = groupby_except(
+        anchored_temperatures, groupby_except_levels,
+    ).quantile(0.5)
 
     peak_wide = _quantile_to_wide(peak_q, "peak_warming", index_levels)
     eoc_wide = _quantile_to_wide(eoc_q, "eoc_warming", index_levels)
@@ -281,7 +284,10 @@ def _declining_from_median_ts(
         drop=True,
     )
     if 2090 not in median_ts.columns or 2100 not in median_ts.columns:
-        return pd.Series([None] * len(median_ts), index=median_ts.index, name="declining")
+        return pd.Series(
+            [None] * len(median_ts),
+            index=median_ts.index, name="declining",
+        )
     declining = median_ts[2100] < median_ts[2090]
     declining.name = "declining"
     return declining

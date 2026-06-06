@@ -107,7 +107,7 @@ def harmonise(
     out = ts.copy()
     skipped: list[str] = []
     for idx, row in ts.iterrows():
-        meta = dict(zip(ts.index.names, idx))
+        meta = dict(zip(ts.index.names, idx, strict=True))
         variable = meta["variable"]
         history_name = _CANONICAL_TO_HISTORY.get(variable, variable)
         if history_name not in history.index:

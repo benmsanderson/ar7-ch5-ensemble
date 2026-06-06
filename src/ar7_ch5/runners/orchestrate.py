@@ -44,7 +44,10 @@ _ADAPTER_CLASSES = {
 _PARALLEL_BUILDERS = frozenset({"ciceroscm", "magicc"})
 
 
-def models_supporting(mode: RunMode, candidates: Sequence[str] = MODEL_NAMES) -> list[str]:
+def models_supporting(
+    mode: RunMode,
+    candidates: Sequence[str] = MODEL_NAMES,
+) -> list[str]:
     """Subset of ``candidates`` whose adapters declare ``mode`` support.
 
     Useful for the RCMIP3 experiment, which runs concentration-driven and
@@ -96,10 +99,15 @@ def build_adapters(
         if mode not in _ADAPTER_CLASSES[m].supported_modes
     ]
     if unsupported:
+        supported_modes_summary = {
+            m: sorted(
+                x.value for x in _ADAPTER_CLASSES[m].supported_modes
+            )
+            for m in unsupported
+        }
         raise ValueError(
             f"Model(s) {unsupported} do not declare {mode.value!r} support "
-            f"(adapter supported_modes: "
-            f"{ {m: sorted(x.value for x in _ADAPTER_CLASSES[m].supported_modes) for m in unsupported} }). "
+            f"(adapter supported_modes: {supported_modes_summary}). "
             "Filter the model list with ar7_ch5.runners.orchestrate."
             "models_supporting() before calling this."
         )

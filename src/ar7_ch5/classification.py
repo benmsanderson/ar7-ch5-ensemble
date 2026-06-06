@@ -23,9 +23,10 @@ import numpy as np
 import pandas as pd
 
 # Temperature variable names in the SCI xlsx (Climate Assessment namespace).
-TEMP_MEDIAN = "Climate Assessment|Surface Temperature (GSAT)|Median [MAGICCv7.5.3]"
-TEMP_P33 = "Climate Assessment|Surface Temperature (GSAT)|33rd Percentile [MAGICCv7.5.3]"
-TEMP_P67 = "Climate Assessment|Surface Temperature (GSAT)|67th Percentile [MAGICCv7.5.3]"
+_GSAT = "Climate Assessment|Surface Temperature (GSAT)"
+TEMP_MEDIAN = f"{_GSAT}|Median [MAGICCv7.5.3]"
+TEMP_P33 = f"{_GSAT}|33rd Percentile [MAGICCv7.5.3]"
+TEMP_P67 = f"{_GSAT}|67th Percentile [MAGICCv7.5.3]"
 
 YEAR_COLS = [str(y) for y in range(2010, 2105, 5)]
 
@@ -241,7 +242,10 @@ GW_COLORS = {
     "unclassified": "#9e9e9e",
 }
 
-GW_ORDER = ["GW0", "GW1", "GW2", "GW3", "GW4", "GW5", "GW6", "GW7", "GW8", "unclassified"]
+GW_ORDER = [
+    "GW0", "GW1", "GW2", "GW3", "GW4",
+    "GW5", "GW6", "GW7", "GW8", "unclassified",
+]
 
 # Per-scenario colours for ScenarioMIP CMIP7 (temperature-ordered, cool to warm).
 # ssp2c sits between l (~1.9 K) and ml (~2.5 K) in end-of-century warming.

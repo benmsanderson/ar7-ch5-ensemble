@@ -48,7 +48,7 @@ class Style:
     font_size: int
 
     @classmethod
-    def from_yaml(cls, path: str | Path) -> "Style":
+    def from_yaml(cls, path: str | Path) -> Style:
         data = yaml.safe_load(Path(path).read_text())
         return cls(
             scenario_colors=dict(data.get("scenario_colors", {})),

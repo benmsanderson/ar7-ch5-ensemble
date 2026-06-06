@@ -27,7 +27,10 @@ pytestmark = pytest.mark.smoke
 
 def _have_all_ncs() -> bool:
     iam, scenario = PATHWAY
-    return all((OUTPUTS_DIR / m / pathway_nc_name(iam, scenario)).is_file() for m in MODELS)
+    return all(
+        (OUTPUTS_DIR / m / pathway_nc_name(iam, scenario)).is_file()
+        for m in MODELS
+    )
 
 
 @pytest.fixture(scope="module")

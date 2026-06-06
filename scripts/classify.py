@@ -74,7 +74,10 @@ def build_parser() -> argparse.ArgumentParser:
         nargs="+",
         default=list(SCM_MODELS),
         choices=SCM_MODELS,
-        help="SCMs to combine when --source is per_model or pooled (default: all three).",
+        help=(
+            "SCMs to combine when --source is per_model or pooled "
+            "(default: all three)."
+        ),
     )
     parser.add_argument(
         "--output",
@@ -98,7 +101,10 @@ def _classify_from_xlsx(df: pd.DataFrame) -> pd.DataFrame:
 
     print("Classification (MAGICC percentiles in xlsx)...")
     warming = classify_warming(df)
-    cc = warming["category"].value_counts().reindex(GW_ORDER).dropna().astype(int).to_dict()
+    cc = (
+        warming["category"].value_counts()
+        .reindex(GW_ORDER).dropna().astype(int).to_dict()
+    )
     print(f"  {cc}")
 
     vetted_pairs = vetting.loc[
@@ -147,7 +153,10 @@ def _classify_from_metrics(df: pd.DataFrame, args) -> pd.DataFrame:
     warming = classify_from_metrics(metrics).reset_index()
     warming = warming.rename(columns={"model": "Model", "scenario": "Scenario"})
 
-    cc = warming["category"].value_counts().reindex(GW_ORDER).dropna().astype(int).to_dict()
+    cc = (
+        warming["category"].value_counts()
+        .reindex(GW_ORDER).dropna().astype(int).to_dict()
+    )
     print(f"  classification ({args.source}): {cc}")
     # Per-SCM breakdown surfaces the cross-model spread that the emissions-based
     # path is meant to expose; the headline `source` choice is a CLI flag, not

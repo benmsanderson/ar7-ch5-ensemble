@@ -68,7 +68,7 @@ def test_sustainability_counts(vetted_df):
 
 
 def test_benchmark_intersection(vetting, vetted_df):
-    """No-major-concerns set: vetting passed and worst_{feasibility,sustainability} != major."""
+    """No-major-concerns: vetting passed and worst_{feas,sust} != major."""
     feas = apply_feasibility(vetted_df)
     sust = apply_sustainability(vetted_df)
     combined = (
@@ -92,7 +92,10 @@ def warming(sci_df):
 
 def test_classification_counts(warming):
     """GW main-category distribution over the full 1599-scenario ensemble."""
-    counts = warming["category"].value_counts().reindex(GW_ORDER).dropna().astype(int).to_dict()
+    counts = (
+        warming["category"].value_counts()
+        .reindex(GW_ORDER).dropna().astype(int).to_dict()
+    )
     assert counts == {
         "GW0": 15, "GW1": 128, "GW2": 249, "GW3": 365, "GW4": 192,
         "GW5": 244, "GW6": 122, "GW7": 109, "GW8": 117, "unclassified": 58,

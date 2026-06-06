@@ -131,22 +131,25 @@ def _load_charlie(csv: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
         if c.replace(".", "").replace("-", "").isdigit()
     ]
     ssp2 = df.loc[df["scenario"] == "SSP2COM"].set_index("variable")[year_cols]
-    l = df.loc[df["scenario"] == "L"].set_index("variable")[year_cols]
+    l_rows = df.loc[df["scenario"] == "L"].set_index("variable")[year_cols]
     ssp2.columns = [float(c) for c in ssp2.columns]
-    l.columns = [float(c) for c in l.columns]
-    return ssp2, l
+    l_rows.columns = [float(c) for c in l_rows.columns]
+    return ssp2, l_rows
 
 
 def _is_l_fallback(
     species_charlie: str,
     ssp2: pd.DataFrame,
-    l: pd.DataFrame,
+    l_rows: pd.DataFrame,
     anchor_year: float = 2023.5,
 ) -> bool:
     """True if Charlie's SSP2COM equals his L scenario at the anchor year."""
-    if species_charlie not in ssp2.index or species_charlie not in l.index:
+    if species_charlie not in ssp2.index or species_charlie not in l_rows.index:
         return False
-    return abs(ssp2.at[species_charlie, anchor_year] - l.at[species_charlie, anchor_year]) < 1e-6
+    return abs(
+        ssp2.at[species_charlie, anchor_year]
+        - l_rows.at[species_charlie, anchor_year]
+    ) < 1e-6
 
 
 def compare(
@@ -186,7 +189,10 @@ def summarise(comparison: pd.DataFrame) -> None:
     print()
     print("=" * 78)
     print("Comparison summary: ours (light global harmoniser, 2023 anchor) vs")
-    print("                    Charlie's (SSP2-COM input + L-scenario anchored history)")
+    print(
+        "                    Charlie's (SSP2-COM input + L-scenario "
+        "anchored history)"
+    )
     print("=" * 78)
 
     fallback_species = sorted(set(fallback["charlie_variable"]))
@@ -212,10 +218,14 @@ def summarise(comparison: pd.DataFrame) -> None:
     )
     print(f"  {fallback_species}")
     print(
-        "\n  These divergences are NOT a harmonisation disagreement: the scenariocompass\n"
-        "  xlsx we use carries these species' SSP2-COM trajectories explicitly, while\n"
-        "  Charlie's CSV does not. Our values reflect what SSP2-COM actually projects;\n"
-        "  Charlie's reflect his L-scenario default. Both are defensible given their\n"
+        "\n  These divergences are NOT a harmonisation disagreement: the "
+        "scenariocompass\n"
+        "  xlsx we use carries these species' SSP2-COM trajectories "
+        "explicitly, while\n"
+        "  Charlie's CSV does not. Our values reflect what SSP2-COM "
+        "actually projects;\n"
+        "  Charlie's reflect his L-scenario default. Both are defensible "
+        "given their\n"
         "  inputs."
     )
 
