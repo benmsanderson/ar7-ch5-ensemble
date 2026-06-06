@@ -41,6 +41,19 @@ def test_load_config_unknown_id_raises_helpful_keyerror():
 def test_load_figures_returns_full_mapping():
     all_figs = figures.load_figures()
     assert "fig01_classification" in all_figs
+    assert "fig04_ssp2com_validation" in all_figs
     # Every entry should have a title for the make_figures --list display
     for fid, cfg in all_figs.items():
         assert "title" in cfg, f"{fid} missing title"
+
+
+def test_every_yaml_figure_has_a_paired_script():
+    """schemes/figures.yaml entry and notebooks/<id>.py must be in sync."""
+    from ar7_ch5.runners import repo_root
+    nb_dir = repo_root() / "notebooks"
+    for fid in figures.load_figures():
+        script = nb_dir / f"{fid}.py"
+        assert script.is_file(), (
+            f"figure {fid!r} registered in schemes/figures.yaml but "
+            f"no script at {script.relative_to(repo_root())}"
+        )
