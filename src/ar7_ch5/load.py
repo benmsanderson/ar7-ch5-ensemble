@@ -27,6 +27,8 @@ from pathlib import Path
 import pandas as pd
 import scmdata
 
+from ._rcmip3_naming import canonical_for
+
 SCI_INFILLED_NAMESPACE = "Climate Assessment|Infilled|"
 
 # Parents stripped when present at the head of the variable body (after
@@ -181,13 +183,21 @@ def load_sci_infilled(
 ) -> scmdata.ScmRun:
     """Load SCI infilled driving emissions as a canonical ScmRun.
 
+    The returned ScmRun carries both ``pathway_id`` (the chapter pathway
+    identifier, e.g. ``SSP1-19``) and ``scenario`` (the canonical RCMIP3
+    name the runner splices against, e.g. ``ssp119``). See
+    :mod:`ar7_ch5._rcmip3_naming` for the mapping and
+    ``docs/engine_upstream_switch.md`` for why.
+
     Parameters
     ----------
     path
         Path to the SCI ensemble ``.xlsx``.
     scenario, model
-        Optional filters. SCI scenario names are not unique across IAMs, so
-        passing ``model`` as well selects a single pathway.
+        Optional filters. ``scenario`` selects on the chapter pathway id
+        (the original SCI scenario value). SCI scenario names are not
+        unique across IAMs, so passing ``model`` as well selects a single
+        pathway.
     region
         Region to keep (SCI global file is ``World`` only).
     sheet
@@ -199,8 +209,8 @@ def load_sci_infilled(
     Returns
     -------
     scmdata.ScmRun
-        One timeseries per (model, scenario, variable), variable names
-        canonicalised to the adapter convention.
+        One timeseries per (model, pathway_id, scenario, variable);
+        variable names canonicalised to the adapter convention.
     """
     path = Path(path)
     df = _prepare_sci_frame(path, region=region, sheet=sheet)
@@ -215,6 +225,7 @@ def load_sci_infilled(
             f"(scenario={scenario!r}, model={model!r}, region={region!r})."
         )
 
+    df = _attach_rcmip3_canonical(df)
     run = scmdata.ScmRun(df)
     if to_annual:
         run = _interpolate_annual(run)
@@ -228,20 +239,37 @@ def iter_sci_infilled(
     sheet: str = "data",
     to_annual: bool = True,
 ) -> Iterator[tuple[str, str, scmdata.ScmRun]]:
-    """Yield ``(model, scenario, ScmRun)`` for every pathway in the SCI file.
+    """Yield ``(model, pathway_id, ScmRun)`` for every pathway in the SCI file.
 
-    Reads and canonicalises the worksheet once (via the CSV cache), then groups
-    by ``(model, scenario)`` and yields one driving-emissions ScmRun per
-    pathway. This is the batch entry point: it avoids re-reading the cache once
-    per scenario, which ``load_sci_infilled`` would do when looped.
+    Reads and canonicalises the worksheet once (via the CSV cache), then
+    groups by ``(model, scenario)`` (the chapter pathway), attaches
+    ``pathway_id`` + canonical ``scenario`` meta columns, and yields one
+    driving-emissions ScmRun per pathway. This is the batch entry point:
+    it avoids re-reading the cache once per scenario, which
+    ``load_sci_infilled`` would do when looped.
     """
     path = Path(path)
     df = _prepare_sci_frame(path, region=region, sheet=sheet)
-    for (model, scenario), group in df.groupby(["model", "scenario"], sort=True):
+    for (model, pathway_id), group in df.groupby(["model", "scenario"], sort=True):
+        group = _attach_rcmip3_canonical(group)
         run = scmdata.ScmRun(group)
         if to_annual:
             run = _interpolate_annual(run)
-        yield str(model), str(scenario), run
+        yield str(model), str(pathway_id), run
+
+
+def _attach_rcmip3_canonical(df: pd.DataFrame) -> pd.DataFrame:
+    """Attach ``pathway_id`` (original) and overwrite ``scenario`` (canonical).
+
+    The chapter pathway id is preserved on a parallel ``pathway_id`` meta
+    column; ``scenario`` is overwritten with the RCMIP3 canonical name the
+    runner expects. Both flow through to the output ScmRun as first-class
+    meta columns.
+    """
+    df = df.copy()
+    df["pathway_id"] = df["scenario"]
+    df["scenario"] = df["scenario"].map(canonical_for)
+    return df
 
 
 def _prepare_sci_frame(

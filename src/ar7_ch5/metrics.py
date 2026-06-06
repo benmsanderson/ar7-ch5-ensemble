@@ -17,7 +17,7 @@ parameter; see ``project_classification_warming_contract``):
   members across all climate_models. Widens the spread relative to B1.
 
 Inputs are the NetCDFs written by :func:`ar7_ch5.experiments.sci_ensemble.run_sci_batch`
-under ``<outputs_dir>/<scm>/sci_<iam>_<scenario>.nc``.
+under ``<outputs_dir>/<scm>/sci_<iam>_<pathway_id>.nc``.
 """
 
 from __future__ import annotations
@@ -47,14 +47,20 @@ CLASSIFICATION_QUANTILES: tuple[float, ...] = (0.5, 0.67)
 
 # Anchoring is always per-model so each SCM is calibrated to its own
 # assessment-period match before any cross-model pooling happens.
-_ANCHOR_GROUP_COLS = ["climate_model", "model", "scenario"]
+_ANCHOR_GROUP_COLS = ["climate_model", "model", "pathway_id"]
 
 Source = Literal["per_model", "pooled"]
 
 
-def pathway_nc_name(iam: str, scenario: str) -> str:
-    """Match the filename convention written by run_sci_batch."""
-    stem = f"sci_{iam}_{scenario}".replace("/", "-").replace(" ", "-")
+def pathway_nc_name(iam: str, pathway_id: str) -> str:
+    """Match the filename convention written by run_sci_batch.
+
+    Keys on the chapter ``pathway_id`` (e.g. ``SSP1-19``) rather than the
+    canonical RCMIP3 ``scenario`` (e.g. ``ssp119``), because multiple
+    pathways can share a canonical and would clobber a scenario-keyed
+    filename. See ``docs/engine_upstream_switch.md``.
+    """
+    stem = f"sci_{iam}_{pathway_id}".replace("/", "-").replace(" ", "-")
     return f"{stem}.nc"
 
 
@@ -71,7 +77,8 @@ def load_pathway_outputs(
     Parameters
     ----------
     pathways
-        Iterable of ``(iam, scenario)`` pairs to load.
+        Iterable of ``(iam, pathway_id)`` pairs to load (chapter
+        identifiers, e.g. ``("AIM/CGE 2.0", "SSP1-19")``).
     models
         SCM subdirectory names under ``outputs_dir`` (``"fair", "ciceroscm", "magicc"``).
     outputs_dir
@@ -84,18 +91,18 @@ def load_pathway_outputs(
     Returns
     -------
     pandas DataFrame in the pandas-openscm MultiIndex convention: index levels
-    ``(variable, unit, region, model, scenario, climate_model, run_id)``;
+    ``(variable, unit, region, model, pathway_id, climate_model, run_id)``;
     columns are integer years. Raises ``FileNotFoundError`` if no NetCDF is
     found for any of the requested pathways.
     """
     out_dir = Path(outputs_dir)
     pieces: list[pd.DataFrame] = []
     missing: list[tuple[str, str, str]] = []
-    for iam, scenario in pathways:
+    for iam, pathway_id in pathways:
         for scm in models:
-            path = out_dir / scm / pathway_nc_name(iam, scenario)
+            path = out_dir / scm / pathway_nc_name(iam, pathway_id)
             if not path.is_file():
-                missing.append((scm, iam, scenario))
+                missing.append((scm, iam, pathway_id))
                 continue
             run = scmdata.ScmRun.from_nc(path)
             run = run.filter(variable=variable, region=region)
@@ -103,12 +110,12 @@ def load_pathway_outputs(
                 continue
             ts = run.timeseries()
             ts.columns = pd.Index([t.year for t in ts.columns], name="year")
-            # Adapters disagree on what the IAMC ``model`` and ``scenario`` meta
-            # carry through (FaIR drops them, CICERO mirrors scenario into both,
-            # MAGICC preserves them). Overwrite from the input pair so all SCMs
-            # share the same (model, scenario) group key.
+            # Adapters disagree on what the IAMC ``model`` and ``pathway_id``
+            # meta carry through (FaIR drops them, CICERO mirrors scenario
+            # into both, MAGICC preserves them). Overwrite from the input
+            # pair so all SCMs share the same (model, pathway_id) group key.
             ts = _set_index_level(ts, "model", iam)
-            ts = _set_index_level(ts, "scenario", scenario)
+            ts = _set_index_level(ts, "pathway_id", pathway_id)
             pieces.append(ts)
 
     if not pieces:
@@ -127,15 +134,28 @@ def load_pathway_outputs(
 
 
 def _set_index_level(df: pd.DataFrame, level: str, value: str) -> pd.DataFrame:
-    """Set an existing MultiIndex level to a constant value."""
-    if level not in df.index.names:
-        raise KeyError(f"index level {level!r} not present in {df.index.names}")
-    levels = [
-        [value] * df.shape[0] if name == level else df.index.get_level_values(name)
-        for name in df.index.names
-    ]
+    """Set a MultiIndex level to a constant value, adding the level if absent.
+
+    The adapters disagree on which meta columns they carry through (and
+    older SCI NetCDFs from before the pathway_id refactor don't have it at
+    all). Treat the input pair from :func:`load_pathway_outputs` as the
+    source of truth: if the level exists, overwrite it; if it doesn't,
+    append it.
+    """
     df = df.copy()
-    df.index = pd.MultiIndex.from_arrays(levels, names=df.index.names)
+    if level in df.index.names:
+        levels = [
+            [value] * df.shape[0] if name == level
+            else df.index.get_level_values(name)
+            for name in df.index.names
+        ]
+        df.index = pd.MultiIndex.from_arrays(levels, names=df.index.names)
+    else:
+        new_names = [*df.index.names, level]
+        new_arrays = [
+            df.index.get_level_values(n) for n in df.index.names
+        ] + [[value] * df.shape[0]]
+        df.index = pd.MultiIndex.from_arrays(new_arrays, names=new_names)
     return df
 
 
@@ -166,9 +186,9 @@ def anchor_to_assessment(
 def _quantile_levels(source: Source) -> tuple[str, list[str]]:
     """Return ``(groupby_except_levels, group_index_levels)`` for ``source``."""
     if source == "per_model":
-        return "run_id", ["model", "scenario", "climate_model"]
+        return "run_id", ["model", "pathway_id", "climate_model"]
     if source == "pooled":
-        return ["run_id", "climate_model"], ["model", "scenario"]
+        return ["run_id", "climate_model"], ["model", "pathway_id"]
     raise ValueError(
         f"unknown source={source!r}; expected 'per_model' or 'pooled'"
     )
@@ -194,8 +214,9 @@ def compute_warming_metrics(
 
     Returns
     -------
-    DataFrame with one row per scenario group (``(model, scenario, climate_model)``
-    for ``per_model``; ``(model, scenario)`` for ``pooled``) and columns
+    DataFrame with one row per pathway group (``(model, pathway_id,
+    climate_model)`` for ``per_model``; ``(model, pathway_id)`` for
+    ``pooled``) and columns
     ``peak_warming_<qq>`` and ``eoc_warming_<qq>`` for each quantile (e.g.
     ``peak_warming_50``, ``peak_warming_67``), plus ``declining`` (median
     2100 < median 2090; None if either is missing).

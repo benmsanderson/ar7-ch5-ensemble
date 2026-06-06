@@ -16,7 +16,11 @@ from collections.abc import Iterable, Sequence
 from openscm_runner import RunMode
 from openscm_runner.adapters import CICEROSCMPY2
 
-from . import DEFAULT_OUTPUT_VARIABLES, resolve_ciceroscm_calibration
+from . import (
+    DEFAULT_OUTPUT_VARIABLES,
+    resolve_ciceroscm_calibration,
+    resolve_rcmip3_bundle,
+)
 
 
 def build_ciceroscmpy2(
@@ -44,6 +48,7 @@ def build_ciceroscmpy2(
     overrides = {} if max_workers is None else {"max_workers": max_workers}
     return CICEROSCMPY2.from_native_distribution(
         resolve_ciceroscm_calibration(),
+        resolve_rcmip3_bundle(),
         mode=mode,
         member_indices=member_indices,
         output_variables=tuple(output_variables),

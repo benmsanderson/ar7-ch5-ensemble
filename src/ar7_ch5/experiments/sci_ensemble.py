@@ -37,7 +37,7 @@ from ar7_ch5.runners import (
     DEFAULT_OUTPUT_VARIABLES,
     MODEL_NAMES,
 )
-from ar7_ch5.runners.orchestrate import run_models
+from ar7_ch5.runners.orchestrate import attach_pathway_id, run_models
 
 # Meta columns promoted to NetCDF dimensions within a single-model file.
 # ``run_id`` indexes the ensemble members and ``region`` keeps MAGICC's
@@ -46,9 +46,15 @@ from ar7_ch5.runners.orchestrate import run_models
 NC_DIMENSIONS = ("run_id", "region", "variable")
 
 MANIFEST_NAME = "manifest.csv"
+# ``pathway_id`` is the chapter pathway identifier (e.g. ``SSP1-19``);
+# ``scenario`` is the canonical RCMIP3 name the runner spliced against
+# (e.g. ``ssp119``). Both flow through to the manifest so the audit
+# trail "which bundle row supplied the splice for this pathway?" is
+# answerable from the manifest alone.
 MANIFEST_FIELDS = (
     "scm",
     "iam",
+    "pathway_id",
     "scenario",
     "filename",
     "status",
@@ -59,9 +65,15 @@ MANIFEST_FIELDS = (
 )
 
 
-def pathway_filename(iam: str, scenario: str) -> str:
-    """Filesystem-safe per-pathway NetCDF name (IAM names carry ``/`` and spaces)."""
-    stem = f"sci_{iam}_{scenario}".replace("/", "-").replace(" ", "-")
+def pathway_filename(iam: str, pathway_id: str) -> str:
+    """Filesystem-safe per-pathway NetCDF name.
+
+    Keys on the chapter ``pathway_id`` rather than the canonical
+    ``scenario``, because multiple chapter pathways can share a
+    canonical (e.g. SCI's ``SSP1-26`` and ``SSP1-34`` both map to
+    ``ssp126``) -- a scenario-keyed filename would collide.
+    """
+    stem = f"sci_{iam}_{pathway_id}".replace("/", "-").replace(" ", "-")
     return f"{stem}.nc"
 
 
@@ -69,7 +81,8 @@ def pathway_filename(iam: str, scenario: str) -> str:
 class PathwayResult:
     scm: str
     iam: str
-    scenario: str
+    pathway_id: str
+    scenario: str  # canonical RCMIP3 name
     filename: str
     status: str  # "written" | "skipped" | "failed"
     n_members: int | None
@@ -134,14 +147,16 @@ def run_sci_batch(
     manifest = out / MANIFEST_NAME
     pairs = iter_sci_infilled(xlsx, region=region)
     progress = tqdm(pairs, total=total, unit="pathway", desc="SCI batch")
-    for i, (iam, scenario, run) in enumerate(progress):
+    for i, (iam, pathway_id, run) in enumerate(progress):
         if limit is not None and i >= limit:
             break
-        progress.set_postfix_str(f"{iam}/{scenario}")
+        progress.set_postfix_str(f"{iam}/{pathway_id}")
+        scenario = run.get_unique_meta("scenario")[0]
         for scm in models:
             result = _run_one(
                 scm,
                 iam,
+                pathway_id,
                 scenario,
                 run,
                 n_members=n_members,
@@ -159,6 +174,7 @@ def run_sci_batch(
 def _run_one(
     scm: str,
     iam: str,
+    pathway_id: str,
     scenario: str,
     run,
     *,
@@ -168,12 +184,13 @@ def _run_one(
     overwrite: bool,
     max_workers: int | None,
 ) -> PathwayResult:
-    filename = pathway_filename(iam, scenario)
+    filename = pathway_filename(iam, pathway_id)
     target = out / scm / filename
 
     if target.is_file() and not overwrite:
         return PathwayResult(
-            scm, iam, scenario, filename, "skipped", n_members, 0, 0.0, ""
+            scm, iam, pathway_id, scenario, filename, "skipped",
+            n_members, 0, 0.0, "",
         )
 
     start = time.perf_counter()
@@ -185,20 +202,17 @@ def _run_one(
             output_variables=output_variables,
             max_workers=max_workers,
         )
+        # Adapter dropped pathway_id (it's not a standard meta column);
+        # restore from the iteration variable so the NetCDF carries both
+        # pathway_id (chapter) and scenario (canonical RCMIP3).
+        result = attach_pathway_id(result, pathway_id)
         _drop_unwritable_metadata(result)
         target.parent.mkdir(parents=True, exist_ok=True)
         result.to_nc(target, dimensions=list(NC_DIMENSIONS))
         elapsed = time.perf_counter() - start
         return PathwayResult(
-            scm,
-            iam,
-            scenario,
-            filename,
-            "written",
-            n_members,
-            result.shape[0],
-            elapsed,
-            "",
+            scm, iam, pathway_id, scenario, filename, "written",
+            n_members, result.shape[0], elapsed, "",
         )
     except Exception as exc:  # noqa: BLE001 - record and continue the batch
         elapsed = time.perf_counter() - start
@@ -206,15 +220,8 @@ def _run_one(
         target.unlink(missing_ok=True)
         traceback.print_exc()
         return PathwayResult(
-            scm,
-            iam,
-            scenario,
-            filename,
-            "failed",
-            n_members,
-            0,
-            elapsed,
-            f"{type(exc).__name__}: {exc}",
+            scm, iam, pathway_id, scenario, filename, "failed",
+            n_members, 0, elapsed, f"{type(exc).__name__}: {exc}",
         )
 
 

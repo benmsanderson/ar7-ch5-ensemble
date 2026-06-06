@@ -141,4 +141,11 @@ def load_rcmip3_concentrations(
     meta_cols = [c for c in df.columns if not (isinstance(c, str) and c.isdigit())]
     df = df[meta_cols + year_cols].rename(columns=rename)
 
+    # RCMIP3 scenarios are already canonical; pathway_id == scenario by
+    # construction. We emit the column for cross-experiment uniformity --
+    # figures, metrics, and the cache reporter all index by pathway_id
+    # regardless of input set; see docs/engine_upstream_switch.md.
+    df = df.copy()
+    df["pathway_id"] = df["scenario"]
+
     return scmdata.ScmRun(df)

@@ -49,11 +49,15 @@ ruff = "*"
 pip = "*"
 
 # Climate models, scenario IO, and the SCM engine.
-# The engine is pinned to Ben's modernised openscm-runner fork until the
-# upstream PRs land (see ar7-ch5-ensemble-brief.md, section 3).
+# Engine is pinned to the upstream openscm-runner feature branch hosting
+# the modernised FaIR2 / CICEROSCMPY2 adapters, the run-mode enum, and
+# the strict canonical RCMIP3 splice path. See
+# ar7-ch5-ensemble-brief.md section 3 and
+# docs/engine_upstream_switch.md for the upstream contract and our
+# pathway_id / canonical-scenario shim.
 [pypi-dependencies]
 ar7-ch5 = { path = ".", editable = true }
-openscm-runner = { git = "https://github.com/benmsanderson/openscm-runner.git", branch = "feat/fair2-ciceroscmpy2-adapters-and-runmode" }
+openscm-runner = { git = "https://github.com/openscm/openscm-runner.git", branch = "feat/fair2-ciceroscmpy2-adapters-and-runmode-nonfork" }
 fair = ">=2.2.4"
 ciceroscm = "==2.1.2"
 pymagicc = "*"

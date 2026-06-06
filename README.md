@@ -42,10 +42,17 @@ pixi run test
 
 ## Engine
 
-The SCM engine is the modernised openscm-runner fork
-(github.com/benmsanderson/openscm-runner, branch `modernisation/integration`),
-pinned in `pixi.toml` until the upstream PRs land. This repository is the
-*application*; the fork is the *engine*.
+The SCM engine is the upstream openscm-runner feature branch hosting the
+modernised FaIR2 / CICEROSCMPY2 adapters and the strict canonical RCMIP3
+splice path (github.com/openscm/openscm-runner, branch
+`feat/fair2-ciceroscmpy2-adapters-and-runmode-nonfork`), pinned in
+`pixi.toml` until those PRs land on main. This repository is the
+*application*; the runner is the *engine*. Scenarios that aren't RCMIP3-
+canonical (SCI's `SSPx-NN`, ScenarioMIP's `VL`/`L`/.../`H`, SSP2-COM)
+flow through a chapter-side mapping to a canonical RCMIP3 name on the
+`scenario` meta column while the chapter pathway identifier is preserved
+on a parallel `pathway_id` meta column; see
+[docs/engine_upstream_switch.md](docs/engine_upstream_switch.md).
 
 ## How emissions reach the models
 

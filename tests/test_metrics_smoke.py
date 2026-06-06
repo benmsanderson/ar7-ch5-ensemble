@@ -74,9 +74,14 @@ def test_per_model_physical(metrics_per_model):
 
 
 def test_pooled_shape(metrics_pooled):
-    """Pooled mode collapses across climate_model: one row per pathway."""
+    """Pooled mode collapses across climate_model: one row per pathway.
+
+    Pathway identity is on ``pathway_id`` (the chapter id, e.g.
+    ``SSP1-19``); ``scenario`` carries the canonical RCMIP3 name
+    (``ssp119``).
+    """
     assert len(metrics_pooled) == 1
-    assert set(metrics_pooled.index.names) == {"model", "scenario"}
+    assert set(metrics_pooled.index.names) == {"model", "pathway_id"}
 
 
 def test_pooled_between_per_model_extremes(metrics_per_model, metrics_pooled):

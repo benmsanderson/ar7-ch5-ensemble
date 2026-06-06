@@ -48,8 +48,9 @@ def result(out_dir):
 
 
 def test_run_succeeds_and_writes_netcdf(result, out_dir):
-    """One NetCDF per requested SCM lands under output_dir."""
-    nc = out_dir / "FaIRv2.2.4.nc"
+    """One NetCDF per (pathway, SCM) lands under <output_dir>/<scm>/."""
+    from ar7_ch5.load_ssp2com import SSP2COM_PATHWAY_ID
+    nc = out_dir / "fair" / f"ssp2com_{SSP2COM_PATHWAY_ID}.nc"
     assert nc.is_file(), f"expected {nc} to exist"
 
 

@@ -52,7 +52,7 @@ Concretely:
 
 | Layer        | What                                          | Source                                                                |
 |--------------|-----------------------------------------------|-----------------------------------------------------------------------|
-| SCM engine     | openscm-runner (modernised fork)              | github.com/benmsanderson/openscm-runner, branch `feat/fair2-ciceroscmpy2-adapters-and-runmode` until upstream PRs land |
+| SCM engine     | openscm-runner (upstream feat branch)         | github.com/openscm/openscm-runner, branch `feat/fair2-ciceroscmpy2-adapters-and-runmode-nonfork` until upstream PRs land on main; chapter scenarios bridged via `ar7_ch5._rcmip3_naming` (see `docs/engine_upstream_switch.md`) |
 | FaIR 2.x       | fair >=2.2.4                                  | Calibration zenodo.org/records/18828694                               |
 | CICERO-SCM     | ciceroscm 2.1.2                               | github.com/ciceroOslo/ciceroscm; calibration zenodo.org/records/20506399 |
 | MAGICC         | pymagicc + licensed MAGICC v7.5.3 binary      | gitlab.com/magicc/magicc; AR6 600-member drawnset                     |

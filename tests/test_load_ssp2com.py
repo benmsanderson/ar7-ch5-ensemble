@@ -12,8 +12,9 @@ import pytest
 
 from ar7_ch5.load import CANONICAL_EMISSIONS
 from ar7_ch5.load_ssp2com import (
+    SSP2COM_CANONICAL_SCENARIO,
     SSP2COM_MODEL,
-    SSP2COM_SCENARIO,
+    SSP2COM_PATHWAY_ID,
     load_ssp2com_world_total,
 )
 from ar7_ch5.runners import repo_root
@@ -34,9 +35,15 @@ def ssp2com_run():
 
 
 def test_single_pathway_meta(ssp2com_run):
-    """The world-total file ships one model x one scenario x World only."""
+    """The world-total file ships one model x one pathway x World only.
+
+    The ScmRun carries both columns: ``pathway_id`` is the chapter
+    identifier (``SSP2-com``); ``scenario`` is the canonical RCMIP3 name
+    the runner splices against (``ssp245``).
+    """
     assert ssp2com_run.get_unique_meta("model") == [SSP2COM_MODEL]
-    assert ssp2com_run.get_unique_meta("scenario") == [SSP2COM_SCENARIO]
+    assert ssp2com_run.get_unique_meta("pathway_id") == [SSP2COM_PATHWAY_ID]
+    assert ssp2com_run.get_unique_meta("scenario") == [SSP2COM_CANONICAL_SCENARIO]
     assert ssp2com_run.get_unique_meta("region") == ["World"]
 
 
