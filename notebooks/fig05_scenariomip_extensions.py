@@ -284,8 +284,11 @@ if missing:
 
 # %%
 HIST_END = 2024     # last historical year drawn in black
-PLOT_END = 2300     # x-axis upper bound; GMD figure goes to 2500 but
-                    # 2300 is the chapter's effective horizon
+PLOT_END = 2500     # x-axis upper bound, matching the GMD CSV horizon
+                    # (the chapter's emissions are extended to 2500 to
+                    # exercise the long-tail extension period)
+PLOT_START = 1980   # x-axis lower bound; pre-1980 is uninteresting
+                    # historical and gets crowded.
 
 fig, axes = plt.subplots(nrows=4, ncols=2, figsize=(13, 14), sharex=True)
 ax = axes.flatten()
@@ -400,12 +403,12 @@ def _draw_scm_panel(
             if scm == "fair":
                 ax.fill_between(
                     years, qs[0.05].values, qs[0.95].values,
-                    color=col, alpha=0.15, lw=0,
+                    color=col, alpha=0.22, lw=0,
                 )
             ax.plot(
                 years, qs[0.5].values,
-                color=col, lw=1.4 if scm == "fair" else 1.1,
-                linestyle=SCM_LINESTYLES[scm],
+                color=col, lw=1.6 if scm == "fair" else 1.2,
+                linestyle=SCM_LINESTYLES[scm], alpha=0.95,
             )
     ax.set_ylabel(ylabel)
     ax.axhline(0, ls=":", color="k", lw=0.5)
@@ -438,20 +441,25 @@ ax[7].set_title("(h) surface air temperature anomaly", loc="left", fontsize=10)
 
 
 # SCM legend on the last panel (line-style key).
+SCM_LABELS = {
+    "fair":      "FaIR (median + 5-95% band)",
+    "ciceroscm": "CICERO-SCM (median)",
+    "magicc":    "MAGICC (median)",
+}
 scm_handles = [
     plt.Line2D(
-        [], [], color="k", lw=1.4 if scm == "fair" else 1.1,
-        linestyle=SCM_LINESTYLES[scm], label=scm,
+        [], [], color="k", lw=1.6 if scm == "fair" else 1.2,
+        linestyle=SCM_LINESTYLES[scm], label=SCM_LABELS.get(scm, scm),
     )
     for scm in models
 ]
 ax[7].legend(
-    handles=scm_handles, ncols=len(models),
+    handles=scm_handles, ncols=1,
     loc="upper left", fontsize=8, frameon=False,
 )
 
 for a in ax:
-    a.set_xlim(1900, PLOT_END)
+    a.set_xlim(PLOT_START, PLOT_END)
 
 fig.suptitle(cfg.get("title", FIGURE_ID), fontsize=12)
 fig.tight_layout(rect=(0, 0, 1, 0.98))

@@ -119,6 +119,16 @@ def build_parser() -> argparse.ArgumentParser:
         "Default: full posterior/drawnset.",
     )
     parser.add_argument(
+        "--end-year",
+        type=int,
+        default=None,
+        help="Upper bound on the input emissions year axis. The "
+        "scenariomip_cmip7 and ssp2com loaders default to 2100; pass "
+        "2300 or 2500 here to feed the SCMs the full long-tail "
+        "extension period (the GMD ScenarioMIP CMIP7 CSV carries data "
+        "to 2500). Has no effect for the sci and rcmip3 experiments.",
+    )
+    parser.add_argument(
         "--list",
         action="store_true",
         help="List available (model, scenario) pairs and exit.",
@@ -258,6 +268,7 @@ def _run_scenariomip(args) -> int:
         f"Running ScenarioMIP CMIP7 ({scenarios}) through {args.models} at "
         f"n_members={n_members} -> {out_dir} (one NetCDF per (scenario, SCM))."
     )
+    end_year = 2100 if args.end_year is None else args.end_year
     result = run_scenariomip(
         csv,
         models=args.models,
@@ -265,6 +276,7 @@ def _run_scenariomip(args) -> int:
         n_members=n_members,
         output_dir=out_dir,
         max_workers=args.max_workers,
+        end_year=end_year,
     )
     _report_gsat(result)
     return 0
