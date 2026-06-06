@@ -17,3 +17,16 @@ fig01_classification:
   # Plot both the full set and the vetted-only subset side-by-side.
   show_vetted_only: true
   output_formats: [png, pdf]
+
+fig04_ssp2com_validation:
+  # Reference comparison: our SSP2-COM driving emissions vs Charlie Koven's
+  # FaIR-only SSP2-COM pipeline. Reads
+  # outputs/ssp2com/validation_vs_charlie.csv (produced by
+  # scripts/validate_ssp2com_vs_charlie.py during M5). The two systematic
+  # differences (Charlie's L-fallback for 8 HFCs; PFC 2025 baseline anomaly
+  # from history disagreement) are explained in docs/methods.md and
+  # surfaced explicitly on the figure.
+  title: "SSP2-COM driving emissions: chapter vs Charlie Koven (M5 validation)"
+  experiment: ssp2com
+  source: validation_vs_charlie
+  output_formats: [png, pdf]
