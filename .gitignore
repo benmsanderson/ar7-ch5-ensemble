@@ -11,6 +11,9 @@ magicc-dist/
 # Pixi environment and lockfile cache
 .pixi/
 
+# Local Claude Code session state (lock file, settings).
+.claude/
+
 # Local path / secret overrides
 .env
 .env.local

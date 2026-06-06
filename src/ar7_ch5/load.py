@@ -21,7 +21,7 @@ the physical ``Emissions|CO2|AFOLU`` and drop ``[NGHGI]`` (see the brief).
 from __future__ import annotations
 
 import json
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from pathlib import Path
 
 import pandas as pd
@@ -238,6 +238,7 @@ def iter_sci_infilled(
     region: str = "World",
     sheet: str = "data",
     to_annual: bool = True,
+    pathways: Iterable[tuple[str, str]] | None = None,
 ) -> Iterator[tuple[str, str, scmdata.ScmRun]]:
     """Yield ``(model, pathway_id, ScmRun)`` for every pathway in the SCI file.
 
@@ -247,15 +248,48 @@ def iter_sci_infilled(
     driving-emissions ScmRun per pathway. This is the batch entry point:
     it avoids re-reading the cache once per scenario, which
     ``load_sci_infilled`` would do when looped.
+
+    If ``pathways`` is given, only ``(model, pathway_id)`` pairs in
+    that set are yielded; the others are skipped silently. Use this to
+    restrict the batch to e.g. the vetted subset (see
+    :func:`vetted_sci_pathways`).
     """
     path = Path(path)
     df = _prepare_sci_frame(path, region=region, sheet=sheet)
+    wanted: set[tuple[str, str]] | None = (
+        {(str(m), str(p)) for m, p in pathways} if pathways is not None else None
+    )
     for (model, pathway_id), group in df.groupby(["model", "scenario"], sort=True):
+        if wanted is not None and (str(model), str(pathway_id)) not in wanted:
+            continue
         group = _attach_rcmip3_canonical(group)
         run = scmdata.ScmRun(group)
         if to_annual:
             run = _interpolate_annual(run)
         yield str(model), str(pathway_id), run
+
+
+def vetted_sci_pathways(
+    classification_csv: str | Path,
+) -> list[tuple[str, str]]:
+    """Return ``[(model, pathway_id), ...]`` for every SCI pathway passing vetting.
+
+    Reads a ``classification_xlsx.csv`` (or per_model / pooled variant)
+    produced by ``scripts/classify.py`` and filters to rows with
+    ``vetting_status == "passed"``. The result is sorted by
+    ``(model, pathway_id)`` for stable iteration order.
+    """
+    df = pd.read_csv(Path(classification_csv))
+    required = {"Model", "Scenario", "vetting_status"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(
+            f"{classification_csv}: missing classification columns "
+            f"{sorted(missing)}; expected output of classify.py."
+        )
+    vetted = df.loc[df["vetting_status"] == "passed", ["Model", "Scenario"]]
+    pairs = [(str(m), str(s)) for m, s in vetted.itertuples(index=False)]
+    return sorted(pairs)
 
 
 def _attach_rcmip3_canonical(df: pd.DataFrame) -> pd.DataFrame:

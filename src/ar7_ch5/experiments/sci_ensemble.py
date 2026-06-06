@@ -102,6 +102,7 @@ def run_sci_batch(
     overwrite: bool = False,
     limit: int | None = None,
     max_workers: int | None = DEFAULT_MAX_WORKERS,
+    pathways: Iterable[tuple[str, str]] | None = None,
 ) -> list[PathwayResult]:
     """Run every SCI pathway through ``models``, one NetCDF per (pathway, model).
 
@@ -129,6 +130,11 @@ def run_sci_batch(
         Process at most this many pathways (for a quick partial pass).
     max_workers
         Worker-process cap per model run (see :data:`DEFAULT_MAX_WORKERS`).
+    pathways
+        If given, restrict the batch to these ``(iam, pathway_id)``
+        pairs and skip every other pathway in the xlsx. Use this to
+        run only the vetted subset (see
+        :func:`ar7_ch5.load.vetted_sci_pathways`).
 
     Returns
     -------
@@ -139,13 +145,17 @@ def run_sci_batch(
     out.mkdir(parents=True, exist_ok=True)
     output_variables = tuple(output_variables)
 
-    total = len(available_sci_scenarios(xlsx, sheet="data"))
+    if pathways is not None:
+        pathways = list(pathways)
+        total = len(pathways)
+    else:
+        total = len(available_sci_scenarios(xlsx, sheet="data"))
     if limit is not None:
         total = min(total, limit)
 
     results: list[PathwayResult] = []
     manifest = out / MANIFEST_NAME
-    pairs = iter_sci_infilled(xlsx, region=region)
+    pairs = iter_sci_infilled(xlsx, region=region, pathways=pathways)
     progress = tqdm(pairs, total=total, unit="pathway", desc="SCI batch")
     for i, (iam, pathway_id, run) in enumerate(progress):
         if limit is not None and i >= limit:

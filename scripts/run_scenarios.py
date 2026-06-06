@@ -152,6 +152,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="With --all, process at most this many pathways (partial pass).",
     )
     parser.add_argument(
+        "--vetted",
+        action="store_true",
+        help="With --all, restrict the SCI batch to pathways that pass "
+        "Riahi 2026 Table SI.1 basic vetting (~330 of ~1599). Reads "
+        "the vetted set from --vetted-from (default: "
+        "outputs/classification_xlsx.csv, produced by "
+        "scripts/classify.py).",
+    )
+    parser.add_argument(
+        "--vetted-from",
+        type=Path,
+        default=None,
+        help="Override the CSV that --vetted reads vetting_status from. "
+        "Must be a classify.py output (columns Model, Scenario, "
+        "vetting_status).",
+    )
+    parser.add_argument(
         "--max-workers",
         type=int,
         default=DEFAULT_MAX_WORKERS,
@@ -317,6 +334,24 @@ def _run_batch(args) -> int:
     """Run the full SCI ensemble, one NetCDF per pathway (milestone 4)."""
     n_members = 200 if args.n_members is None else args.n_members
     out_dir = Path(args.output) / "sci"
+    pathways = None
+    if args.vetted:
+        from ar7_ch5.load import vetted_sci_pathways
+        csv_path = (
+            args.vetted_from
+            or Path(args.output) / "classification_xlsx.csv"
+        )
+        if not Path(csv_path).is_file():
+            raise SystemExit(
+                f"--vetted requires the vetting CSV at {csv_path}. "
+                "Generate it first with: pixi run python scripts/classify.py "
+                "--source xlsx"
+            )
+        pathways = vetted_sci_pathways(csv_path)
+        print(
+            f"--vetted: restricting to {len(pathways)} pathways "
+            f"from {csv_path}."
+        )
     print(
         f"Running SCI ensemble through {args.models} at n_members={n_members} "
         f"-> {out_dir} (one NetCDF per pathway, resumable)."
@@ -329,6 +364,7 @@ def _run_batch(args) -> int:
         overwrite=args.overwrite,
         limit=args.limit,
         max_workers=args.max_workers,
+        pathways=pathways,
     )
     written = sum(r.status == "written" for r in results)
     skipped = sum(r.status == "skipped" for r in results)
