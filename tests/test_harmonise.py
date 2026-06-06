@@ -141,7 +141,9 @@ def test_midpoint_lies_between_history_and_scenario(scenario, harmonised, histor
     full_ratio = h_anchor / s_anchor
     fully_anchored_2037 = s_2037 * full_ratio
     # h_2037 is between s_2037 and fully_anchored_2037.
-    assert min(s_2037, fully_anchored_2037) <= h_2037 <= max(s_2037, fully_anchored_2037)
+    lo = min(s_2037, fully_anchored_2037)
+    hi = max(s_2037, fully_anchored_2037)
+    assert lo <= h_2037 <= hi
 
 
 def test_species_not_in_history_pass_through(scenario, harmonised):

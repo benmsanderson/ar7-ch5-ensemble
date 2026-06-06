@@ -96,7 +96,8 @@ def load_scenariomip_emissions(
         if year_int <= end_year:
             year_cols.append(c)
             new_names[c] = year_int
-    keep_cols = list(_REQUIRED_COLUMNS) + ["long_scenario"] * ("long_scenario" in df.columns) + year_cols
+    long_cols = ["long_scenario"] if "long_scenario" in df.columns else []
+    keep_cols = list(_REQUIRED_COLUMNS) + long_cols + year_cols
     keep_cols = [c for c in keep_cols if c in df.columns]
     df = df[keep_cols].rename(columns=new_names)
 

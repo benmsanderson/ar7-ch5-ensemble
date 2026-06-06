@@ -141,12 +141,16 @@ _SCM_ENUMERATORS = {
 def _classification_csv_status(outputs_dir: Path, source: str) -> CacheEntry:
     target = outputs_dir / f"classification_{source}.csv"
     present = 1 if target.is_file() else 0
+    if target.is_absolute() and target.is_relative_to(repo_root()):
+        output_arg = target.relative_to(repo_root())
+    else:
+        output_arg = target
     return CacheEntry(
         experiment="classification", scm=source,
         expected=1, present=present,
         rerun_cmd=(
             f"pixi run python scripts/classify.py --source {source} "
-            f"--output {target.relative_to(repo_root()) if target.is_absolute() and target.is_relative_to(repo_root()) else target}"
+            f"--output {output_arg}"
         ),
     )
 

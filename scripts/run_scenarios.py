@@ -89,7 +89,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--anchor-year",
         type=int,
         default=DEFAULT_ANCHOR_YEAR,
-        help=f"Harmonisation anchor year (ssp2com only). Default {DEFAULT_ANCHOR_YEAR}.",
+        help=(
+            "Harmonisation anchor year (ssp2com only). "
+            f"Default {DEFAULT_ANCHOR_YEAR}."
+        ),
     )
     parser.add_argument(
         "--convergence-year",
@@ -272,9 +275,10 @@ def _run_ssp2com(args) -> int:
     import os
 
     xlsx = args.input or DEFAULT_SSP2COM_XLSX
-    history = (
-        args.history
-        or Path(os.environ.get("AR7_HARMONISATION_HISTORY", DEFAULT_HARMONISATION_HISTORY))
+    history = args.history or Path(
+        os.environ.get(
+            "AR7_HARMONISATION_HISTORY", DEFAULT_HARMONISATION_HISTORY,
+        )
     )
 
     out_dir = Path(args.output) / "ssp2com"

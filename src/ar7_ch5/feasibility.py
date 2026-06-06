@@ -157,7 +157,7 @@ def apply_feasibility(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _cumulative_ccs(sdf: pd.DataFrame) -> float:
-    """Cumulative geological CO2 storage 2020-2100 (Gt CO2), trapezoidal in 5-yr steps."""
+    """Cumulative geological CO2 storage 2020-2100 (Gt CO2; trapezoidal, 5y)."""
     year_cols = [str(y) for y in range(2020, 2105, 5)]
     for var in _CC_ALIASES:
         rows = sdf.loc[sdf["Variable"] == var]

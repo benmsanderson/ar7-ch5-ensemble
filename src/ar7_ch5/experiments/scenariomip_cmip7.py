@@ -106,7 +106,9 @@ def run_scenariomip(
             print(f"  wrote {target} ({result.shape[0]} rows)")
             pieces.append(result)
 
-    return scmdata.run_append(pieces) if pieces else scmdata.ScmRun(all_scens.timeseries())
+    if pieces:
+        return scmdata.run_append(pieces)
+    return scmdata.ScmRun(all_scens.timeseries())
 
 
 __all__ = ["SCENARIOS", "run_scenariomip"]
