@@ -17,14 +17,15 @@ import os
 from pathlib import Path
 
 # Default diagnostic set. GSAT + total ERF gives the headline temperature
-# and forcing curves; CO2 concentration covers the carbon-cycle response
-# panel of the GMD ScenarioMIP CMIP7 diagnostic plot (fig05). All three
-# adapters (FaIR2, CICEROSCMPY2, MAGICC7) expose these names through
-# their openscm-runner output vocabulary.
+# and forcing curves; CO2 + CH4 concentration cover the carbon and
+# methane-cycle response rows of the per-SCM grid figure (fig06). All
+# three adapters (FaIR2, CICEROSCMPY2, MAGICC7) expose these names
+# through their openscm-runner output vocabulary.
 DEFAULT_OUTPUT_VARIABLES: tuple[str, ...] = (
     "Surface Air Temperature Change",
     "Effective Radiative Forcing",
     "Atmospheric Concentrations|CO2",
+    "Atmospheric Concentrations|CH4",
 )
 
 MODEL_NAMES: tuple[str, ...] = ("fair", "ciceroscm", "magicc")

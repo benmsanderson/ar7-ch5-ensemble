@@ -31,6 +31,18 @@ fig04_ssp2com_validation:
   source: validation_vs_charlie
   output_formats: [png, pdf]
 
+fig06_per_scm_grid:
+  # Per-SCM grid: 4 rows (CO2 concentration, CH4 concentration, total
+  # ERF, GSAT anomaly) x 3 columns (fair, ciceroscm, magicc). Each
+  # panel shows that single SCM's 7-pathway ensemble for that
+  # variable. Easier than fig05 to read the per-SCM behaviour because
+  # SCMs are separated rather than overlaid.
+  title: "ScenarioMIP CMIP7 ensembles per SCM (CO2, CH4, ERF, GSAT)"
+  experiment: scenariomip_cmip7
+  models: [fair, ciceroscm, magicc]
+  pathways: [VL, L, LN, M, ML, H, HL]
+  output_formats: [png, pdf]
+
 fig05_scenariomip_extensions:
   # 8-panel diagnostic for ScenarioMIP CMIP7 baselines, reproducing the
   # layout of fig_extensions in scenariomip-paper-plots (Zenodo 20329427,

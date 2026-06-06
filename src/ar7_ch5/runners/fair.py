@@ -25,6 +25,7 @@ def build_fair2(
     member_indices: Sequence[int] | None = None,
     output_variables: Iterable[str] = DEFAULT_OUTPUT_VARIABLES,
     mode: RunMode = RunMode.EMISSIONS_DRIVEN,
+    end_year: int | None = None,  # noqa: ARG001 -- FaIR respects input axis
 ) -> FAIR2:
     """Configure FaIR 2.x from the native calibration distribution.
 
@@ -37,6 +38,10 @@ def build_fair2(
         Diagnostics to extract.
     mode
         Driving mode (default emissions-driven).
+    end_year
+        Accepted for interface parity with :func:`build_magicc7`; FaIR
+        runs the time axis carried by the input emissions ScmRun so no
+        explicit horizon is needed.
     """
     return FAIR2.from_native_distribution(
         resolve_fair_calibration(),

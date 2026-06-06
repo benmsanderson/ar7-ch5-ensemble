@@ -68,6 +68,7 @@ def build_adapters(
     output_variables: Iterable[str] = DEFAULT_OUTPUT_VARIABLES,
     max_workers: int | None = DEFAULT_MAX_WORKERS,
     mode: RunMode = RunMode.EMISSIONS_DRIVEN,
+    end_year: int | None = None,
 ) -> list:
     """Construct the AdapterLike objects for ``models``.
 
@@ -119,6 +120,7 @@ def build_adapters(
             "member_indices": member_indices,
             "output_variables": output_variables,
             "mode": mode,
+            "end_year": end_year,
         }
         if m in _PARALLEL_BUILDERS:
             kwargs["max_workers"] = max_workers
@@ -154,6 +156,7 @@ def run_models(
     output_variables: Iterable[str] = DEFAULT_OUTPUT_VARIABLES,
     max_workers: int | None = DEFAULT_MAX_WORKERS,
     mode: RunMode = RunMode.EMISSIONS_DRIVEN,
+    end_year: int | None = None,
 ) -> scmdata.ScmRun:
     """Run ``models`` over ``scenarios`` and return the combined ScmRun.
 
@@ -161,7 +164,9 @@ def run_models(
     ``openscm_runner.run.run``; results from all models are concatenated with a
     ``climate_model`` meta column distinguishing them. ``max_workers`` caps the
     per-model worker pool (see :data:`DEFAULT_MAX_WORKERS`). ``mode`` is
-    forwarded to every adapter; see :func:`build_adapters`.
+    forwarded to every adapter; see :func:`build_adapters`. ``end_year`` is
+    forwarded to every adapter so MAGICC overrides pymagicc's 2100 default;
+    FaIR and CICERO-SCM ignore it (they derive the horizon from the input).
     """
     adapters = build_adapters(
         models,
@@ -169,5 +174,6 @@ def run_models(
         output_variables=output_variables,
         max_workers=max_workers,
         mode=mode,
+        end_year=end_year,
     )
     return openscm_runner.run.run(adapters, scenarios=scenarios)
