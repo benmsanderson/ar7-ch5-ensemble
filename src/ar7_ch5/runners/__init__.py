@@ -16,11 +16,15 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-# GSAT plus top-level forcing is enough to prove the engine integration in the
-# smoke test; the full diagnostic set is requested by later milestones.
+# Default diagnostic set. GSAT + total ERF gives the headline temperature
+# and forcing curves; CO2 concentration covers the carbon-cycle response
+# panel of the GMD ScenarioMIP CMIP7 diagnostic plot (fig05). All three
+# adapters (FaIR2, CICEROSCMPY2, MAGICC7) expose these names through
+# their openscm-runner output vocabulary.
 DEFAULT_OUTPUT_VARIABLES: tuple[str, ...] = (
     "Surface Air Temperature Change",
     "Effective Radiative Forcing",
+    "Atmospheric Concentrations|CO2",
 )
 
 MODEL_NAMES: tuple[str, ...] = ("fair", "ciceroscm", "magicc")

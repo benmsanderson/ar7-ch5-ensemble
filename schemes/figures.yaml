@@ -30,3 +30,17 @@ fig04_ssp2com_validation:
   experiment: ssp2com
   source: validation_vs_charlie
   output_formats: [png, pdf]
+
+fig05_scenariomip_extensions:
+  # 8-panel diagnostic for ScenarioMIP CMIP7 baselines, reproducing the
+  # layout of fig_extensions in scenariomip-paper-plots (Zenodo 20329427,
+  # notebooks/0505_extensions_plotting.ipynb). Driven by our pipeline's
+  # NetCDFs at outputs/scenariomip_cmip7/<scm>/scenariomip_<pathway>.nc,
+  # so the figure also serves as a three-SCM comparison: each pathway's
+  # ERF / CO2 concentration / GSAT trace shows fair (solid + 5-95% band),
+  # ciceroscm (dashed median), magicc (dotted median).
+  title: "ScenarioMIP CMIP7 extensions: three-SCM ensemble (fig_extensions reproduction)"
+  experiment: scenariomip_cmip7
+  models: [fair, ciceroscm, magicc]
+  pathways: [VL, L, LN, M, ML, H, HL]
+  output_formats: [png, pdf]
