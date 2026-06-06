@@ -96,6 +96,7 @@ def run_scenariomip(
                 n_members=n_members,
                 output_variables=output_variables,
                 max_workers=max_workers,
+                end_year=end_year,
             )
             # Adapter dropped pathway_id (it's not a standard meta column);
             # restore it from the iteration variable so the NetCDF carries

@@ -29,6 +29,7 @@ def build_ciceroscmpy2(
     output_variables: Iterable[str] = DEFAULT_OUTPUT_VARIABLES,
     mode: RunMode = RunMode.EMISSIONS_DRIVEN,
     max_workers: int | None = None,
+    end_year: int | None = None,  # noqa: ARG001
 ) -> CICEROSCMPY2:
     """Configure CICERO-SCM 2.1.2 from the native calibration distribution.
 
@@ -44,6 +45,9 @@ def build_ciceroscmpy2(
     max_workers
         Worker cap forwarded to ``DistributionRun.run_over_distribution``.
         ``None`` lets the adapter pick (capped at members x scenarios).
+    end_year
+        Accepted for interface parity with :func:`build_magicc7`; CICERO-SCM
+        runs the full time axis of its native distribution by default.
     """
     overrides = {} if max_workers is None else {"max_workers": max_workers}
     return CICEROSCMPY2.from_native_distribution(
