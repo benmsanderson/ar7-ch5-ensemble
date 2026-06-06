@@ -23,9 +23,11 @@ from __future__ import annotations
 
 import csv
 import numbers
+import threading
 import time
 import traceback
 from collections.abc import Iterable, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -36,6 +38,7 @@ from ar7_ch5.runners import (
     DEFAULT_MAX_WORKERS,
     DEFAULT_OUTPUT_VARIABLES,
     MODEL_NAMES,
+    PER_SCM_DEFAULT_WORKERS,
 )
 from ar7_ch5.runners.orchestrate import attach_pathway_id, run_models
 
@@ -155,6 +158,7 @@ def run_sci_batch(
 
     results: list[PathwayResult] = []
     manifest = out / MANIFEST_NAME
+    manifest_lock = threading.Lock()
     pairs = iter_sci_infilled(xlsx, region=region, pathways=pathways)
     progress = tqdm(pairs, total=total, unit="pathway", desc="SCI batch")
     for i, (iam, pathway_id, run) in enumerate(progress):
@@ -162,23 +166,49 @@ def run_sci_batch(
             break
         progress.set_postfix_str(f"{iam}/{pathway_id}")
         scenario = run.get_unique_meta("scenario")[0]
-        for scm in models:
-            result = _run_one(
-                scm,
-                iam,
-                pathway_id,
-                scenario,
-                run,
-                n_members=n_members,
-                output_variables=output_variables,
-                out=out,
-                overwrite=overwrite,
-                max_workers=max_workers,
-            )
-            results.append(result)
-            _append_manifest(manifest, result)
+        # Dispatch all SCMs concurrently per pathway. Each SCM runs in
+        # its own thread; FaIR is in-process (~no contention), CICERO
+        # forks its own worker pool, MAGICC forks its own worker pool.
+        # Per-SCM worker budgets come from PER_SCM_DEFAULT_WORKERS
+        # (overridable via ``max_workers``). Wall-clock is dominated
+        # by the slowest SCM rather than their sum.
+        with ThreadPoolExecutor(max_workers=len(models)) as pool:
+            futures = [
+                pool.submit(
+                    _run_one,
+                    scm,
+                    iam,
+                    pathway_id,
+                    scenario,
+                    run,
+                    n_members=n_members,
+                    output_variables=output_variables,
+                    out=out,
+                    overwrite=overwrite,
+                    max_workers=_workers_for(scm, max_workers),
+                )
+                for scm in models
+            ]
+            for fut in futures:
+                result = fut.result()
+                results.append(result)
+                with manifest_lock:
+                    _append_manifest(manifest, result)
 
     return results
+
+
+def _workers_for(scm: str, override: int | None) -> int | None:
+    """Pick the per-SCM worker budget.
+
+    ``override`` (the caller-supplied ``max_workers``) wins when set.
+    Otherwise look up the SCM's recommended concurrent-dispatch budget
+    in :data:`PER_SCM_DEFAULT_WORKERS`; fall back to
+    :data:`DEFAULT_MAX_WORKERS` for unknown SCMs.
+    """
+    if override is not None:
+        return override
+    return PER_SCM_DEFAULT_WORKERS.get(scm, DEFAULT_MAX_WORKERS)
 
 
 def _run_one(
