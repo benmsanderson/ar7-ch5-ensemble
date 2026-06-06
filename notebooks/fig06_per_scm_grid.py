@@ -46,13 +46,43 @@ from ar7_ch5.runners import repo_root
 FIGURE_ID = "fig06_per_scm_grid"
 
 GMD_PATHWAY_COLORS = {
-    "VL": "#16188F",
-    "LN": "#22e5db",
-    "L":  "#20A359",
-    "ML": "#dec820",
-    "M":  "#fc7b03",
-    "H":  "#a41212",
-    "HL": "#E744F6",
+    "VL":       "#16188F",
+    "LN":       "#22e5db",
+    "L":        "#20A359",
+    "ML":       "#dec820",
+    "M":        "#fc7b03",
+    "H":        "#a41212",
+    "HL":       "#E744F6",
+    # SSP2-COM is sourced separately from scenariocompass and runs through
+    # M5's harmoniser; the colour is the chapter style's sage green
+    # so it sits visually between the ScenarioMIP CMIP7 low and
+    # medium pathways on the warming axis. SSP2-COM data ends at
+    # 2100; the figure shows it as a shorter line on every panel.
+    "SSP2-com": "#8ecda0",
+}
+
+# Where each pathway's NetCDFs live; the ScenarioMIP CMIP7 ones live
+# under outputs/scenariomip_cmip7/, SSP2-COM is its own experiment
+# under outputs/ssp2com/. Filename also differs (scenariomip_<p> vs
+# ssp2com_<p>).
+PATHWAY_EXPERIMENTS = {
+    "VL":       "scenariomip_cmip7",
+    "L":        "scenariomip_cmip7",
+    "LN":       "scenariomip_cmip7",
+    "M":        "scenariomip_cmip7",
+    "ML":       "scenariomip_cmip7",
+    "H":        "scenariomip_cmip7",
+    "HL":       "scenariomip_cmip7",
+    "SSP2-com": "ssp2com",
+}
+
+# Per-pathway upper bound on the year axis. The ScenarioMIP CMIP7
+# emissions extend to 2500; SSP2-COM source data only goes to 2100, so
+# its post-2100 SCM output is bundle-donor (ssp245) extrapolation, not
+# the chapter pathway. Truncate display at 2100 for SSP2-COM so the
+# figure shows the actual chapter scenario.
+PATHWAY_MAX_YEAR = {
+    "SSP2-com": 2100,
 }
 
 SCM_LABELS = {
@@ -91,9 +121,13 @@ models = list(cfg.get("models", list(SCM_LABELS)))
 
 # %%
 def _nc_path(scm: str, pathway: str) -> Path:
+    experiment = PATHWAY_EXPERIMENTS.get(pathway, "scenariomip_cmip7")
+    # Per-experiment filename prefix matches the experiment's
+    # NetCDF-writer convention.
+    prefix = "ssp2com" if experiment == "ssp2com" else "scenariomip"
     return (
-        repo_root() / "outputs" / "scenariomip_cmip7" / scm
-        / f"scenariomip_{pathway}.nc"
+        repo_root() / "outputs" / experiment / scm
+        / f"{prefix}_{pathway}.nc"
     )
 
 
@@ -179,7 +213,11 @@ for row_idx, (row_label, variable, _) in enumerate(ROWS):
             q = data.get((scm, pathway, variable))
             if q is None:
                 continue
-            years = [y for y in q.index if PLOT_START <= y <= PLOT_END]
+            pathway_max = PATHWAY_MAX_YEAR.get(pathway, PLOT_END)
+            years = [
+                y for y in q.index
+                if PLOT_START <= y <= min(PLOT_END, pathway_max)
+            ]
             if not years:
                 continue
             qs = q.loc[years]
