@@ -76,12 +76,24 @@ def resolve_rcmip3_bundle() -> Path:
     those inputs; ``pathway_id`` preserves the chapter identity. See
     ``docs/engine_upstream_switch.md``.
 
-    Override with ``AR7_RCMIP3_BUNDLE``; otherwise look under the staged
-    NAC location, or the in-repo ``data/rcmip3_protocol/`` if present.
+    Resolution order:
+
+    1. ``AR7_RCMIP3_BUNDLE`` env override (caller knows the path).
+    2. In-repo augmented bundle ``data/rcmip3_protocol_augmented/`` --
+       produced by ``scripts/build_rcmip3_bundle_augmented.py``, which
+       splices the seven CMIP7 ScenarioMIP ``scen7-*`` natural-forcing
+       rows from scenariomip-paper-plots (Zenodo 20329427) into the
+       canonical forcing CSV. Preferred when present.
+    3. In-repo vanilla bundle ``data/rcmip3_protocol/`` (Zenodo
+       20430630 as published).
+    4. NAC staged location.
     """
     env = os.environ.get("AR7_RCMIP3_BUNDLE")
     if env:
         return Path(env)
+    augmented = repo_root() / "data" / "rcmip3_protocol_augmented"
+    if augmented.is_dir():
+        return augmented
     in_repo = repo_root() / "data" / "rcmip3_protocol"
     if in_repo.is_dir():
         return in_repo

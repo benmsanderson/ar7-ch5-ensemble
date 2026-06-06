@@ -94,9 +94,52 @@ the adapters load to wire land-use forcings and irrigation albedo
 etc.).
 
 The resolver (:func:`ar7_ch5.runners.resolve_rcmip3_bundle`) accepts
-`AR7_RCMIP3_BUNDLE` as an env override, falls back to the in-repo
-default `data/rcmip3_protocol/`, then to the NAC staged location
+`AR7_RCMIP3_BUNDLE` as an env override, falls back to the augmented
+in-repo bundle at `data/rcmip3_protocol_augmented/` (built in section 4a
+below) when present, then the vanilla in-repo bundle
+`data/rcmip3_protocol/`, then the NAC staged location
 `/storage/no-backup-nac/users/bensan/rcmip3_protocol/`.
+
+### 4a. Augmented RCMIP3 bundle (one-shot build step)
+
+The published RCMIP3 wide CSVs at v2.0.0 are keyed only on the
+SSP-RCP family + `historical`/`historical-cmip6` -- they do not yet
+carry rows for the CMIP7 ScenarioMIP categories (`scen7-VL` ...
+`scen7-HL`), which are listed in the protocol's `scenario_info` sheet
+and shipped as per-category source files in `input_datafiles_generation/`
+but not aggregated into the canonical wide tables. The upstream
+openscm-runner raises `KeyError` on a missing scenario row.
+
+To close that gap without modifying the upstream runner or the
+published bundle, run the chapter's one-shot augmentation script
+after staging the vanilla bundle in section 4:
+
+    pixi run python scripts/build_rcmip3_bundle_augmented.py
+
+The script stages an augmented copy at
+`data/rcmip3_protocol_augmented/` as a symlink farm of the vanilla
+bundle, with two CSVs replaced in place:
+
+- `rcmip_phase3_forcing_v2.0.0.csv` gains 14 new rows for
+  `scen7-VL` ... `scen7-HL` (Solar + Volcanic ERF), sourced from
+  scenariomip-paper-plots (Zenodo 20329427,
+  `data/fair-inputs/volcanic_solar.csv`) -- the GMD paper's
+  authoritative CMIP7 natural-forcing time series.
+- `rcmip_phase3_emissions_v2.0.0.csv` gains `scen7-{cat}` emissions
+  baselines copied from the closest SSP-RCP donor (e.g.
+  `scen7-M -> ssp245`, `scen7-H -> ssp370`), so the chapter's user
+  emissions overlay a defensible baseline at run time. The donor
+  mapping is documented in [methods.md](methods.md).
+
+The augmented bundle is gitignored (`data/` is fully ignored). Re-run
+the script after re-staging the vanilla bundle; pass `--clean` to
+remove the augmented tree first. Once present, the resolver picks it
+up automatically and the upstream runner sees `scen7-{cat}` scenario
+rows exactly as it sees SSP-RCP rows -- no chapter-side scenario
+surrogate or swap-and-restore is needed.
+
+To use the scenariomip-paper-plots `volcanic_solar.csv` from a
+different path, pass `--gmd-volcanic-solar /path/to/volcanic_solar.csv`.
 
 ## 5. MAGICC v7.5.3 binary (licensed)
 

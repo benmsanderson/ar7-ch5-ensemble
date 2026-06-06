@@ -61,8 +61,8 @@ def test_subset_filter():
         pytest.skip(f"ScenarioMIP CSV not staged at {CSV}")
     sub = load_scenariomip_emissions(CSV, scenarios=("M", "H"))
     assert sorted(sub.get_unique_meta("pathway_id")) == ["H", "M"]
-    # canonical_for("M") == "ssp245", canonical_for("H") == "ssp370"
-    assert sorted(sub.get_unique_meta("scenario")) == ["ssp245", "ssp370"]
+    # canonical_for("M") == "scen7-M", canonical_for("H") == "scen7-H"
+    assert sorted(sub.get_unique_meta("scenario")) == ["scen7-H", "scen7-M"]
 
 
 def test_unknown_scenario_raises():

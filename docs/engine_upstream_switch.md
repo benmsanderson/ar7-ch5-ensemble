@@ -96,55 +96,84 @@ would clobber. `pathway_id`-keyed filenames are unique by construction.
 
 ## Mapping table
 
-The SCI-pathway mapping uses the trailing target (the `NN` in
-`SSPx-NN`) when an RCMIP3 SSP-target combination exists, otherwise
-falls back to the SSP family's closest canonical:
+Every entry on the right is a real RCMIP3 protocol name (member of
+`scenario_info` in the bundle's `rcmip_phase3_protocol_v2.0.0.xlsx`)
+that an IPCC reviewer can look up directly in the published bundle.
 
-| Chapter scenario | Canonical | Notes |
+| Chapter pathway | RCMIP3 canonical `scenario` | Notes |
 |---|---|---|
-| SCI: `SSPx-19` | `ssp119` | only `SSP1-19` is meaningful, but accept any family |
-| SCI: `SSPx-26` | `ssp126` | |
-| SCI: `SSPx-34` | `ssp126` | no canonical SSPx-34; SSP-family low fallback |
-| SCI: `SSPx-45` | `ssp245` | |
-| SCI: `SSPx-60` | `ssp460` | only `SSP4-60` is meaningful, but accept any family |
-| SCI: `SSPx-70` | `ssp370` | |
-| SCI: `SSPx-85` | `ssp585` | |
+| SCI: `SSP1-19` | `ssp119` | direct family-target match |
+| SCI: `SSP1-26` | `ssp126` | direct family-target match |
+| SCI: `SSPx-NN` (no direct) | `ssp{family}` family default | e.g. `SSP2-19` -> `ssp245`; `SSP3-26` -> `ssp370` |
 | SCI: `SSP1-Baseline` | `ssp126` | SSP-family default |
 | SCI: `SSP2-Baseline` | `ssp245` | |
 | SCI: `SSP3-Baseline` | `ssp370` | |
 | SCI: `SSP4-Baseline` | `ssp460` | |
 | SCI: `SSP5-Baseline` | `ssp585` | |
-| SSP2-COM: `SSP2-com` | `ssp245` | same anchor SSP as Charlie's pipeline |
-| ScenarioMIP: `VL` | `ssp119` | closest very-low |
-| ScenarioMIP: `L`, `LN` | `ssp126` | low / low-overshoot family |
-| ScenarioMIP: `M` | `ssp245` | medium |
-| ScenarioMIP: `ML`, `HL` | `ssp370` | medium-high / high-LU |
-| ScenarioMIP: `H` | `ssp585` | high |
-| RCMIP3 (M7): `<canonical>` | `<canonical>` | pass through |
+| SSP2-COM: `SSP2-com` | `ssp245` | documented surrogate (no protocol name for SSP2-COM) |
+| ScenarioMIP CMIP7: `VL` | `scen7-VL` | protocol name for the CMIP7 ScenarioMIP "very low" category |
+| ScenarioMIP CMIP7: `L` | `scen7-L` | |
+| ScenarioMIP CMIP7: `LN` | `scen7-LN` | |
+| ScenarioMIP CMIP7: `M` | `scen7-M` | |
+| ScenarioMIP CMIP7: `ML` | `scen7-ML` | |
+| ScenarioMIP CMIP7: `H` | `scen7-H` | |
+| ScenarioMIP CMIP7: `HL` | `scen7-HL` | |
+| RCMIP3 (M7): `1pctCO2`, `abrupt-2xCO2`, `esm-flat10`, ... | same | pass through (already protocol names) |
 
 Unmapped chapter pathways fall to `ssp245` with a NOTE printed -- the
 neutral choice. The mapping is one named function in
 `src/ar7_ch5/_rcmip3_naming.py`; no regex magic, no implicit rules.
+
+### scen7-{cat} canonical CSV coverage at v2.0.0
+
+The published RCMIP3 wide CSVs at v2.0.0 only carry rows for the
+SSP-RCP family + `historical`/`historical-cmip6`; the `scen7-*`
+protocol names are listed in the protocol scenario sheet and shipped
+as per-category source files in `input_datafiles_generation/data/`
+but not aggregated into the canonical wide tables. The upstream
+openscm-runner raises `KeyError` on a missing scenario row.
+
+To close that packaging gap without modifying the upstream runner or
+the published bundle, the chapter stages an augmented bundle at
+data-setup time (`scripts/build_rcmip3_bundle_augmented.py`):
+
+- Seven `scen7-{cat}` Solar + Volcanic rows inserted in
+  `rcmip_phase3_forcing_v2.0.0.csv`, sourced from
+  scenariomip-paper-plots (Zenodo 20329427,
+  `data/fair-inputs/volcanic_solar.csv`).
+- Seven `scen7-{cat}` emissions rows inserted in
+  `rcmip_phase3_emissions_v2.0.0.csv`, copied from an SSP-RCP donor
+  per category (see [methods.md](methods.md) for the donor table).
+
+The augmented bundle lives at `data/rcmip3_protocol_augmented/`,
+preferred by `resolve_rcmip3_bundle()` over the vanilla bundle. With
+this in place the upstream openscm-runner sees `scen7-*` rows
+exactly as it sees SSP-RCP rows -- no scenario surrogate or
+swap-and-restore is needed in the chapter or the runner. See
+[data_setup.md](data_setup.md) section 4a for the build step.
 
 ## What changes (file by file)
 
 ```
 pixi.toml                                EDIT  pin upstream/feat/...-nonfork
 pixi.lock                                EDIT  regenerated
-data/rcmip3_protocol/                    PRESENT  already staged for M7
+data/rcmip3_protocol/                    PRESENT  vanilla bundle (Zenodo 20430630)
+data/rcmip3_protocol_augmented/          BUILT  by scripts/build_rcmip3_bundle_augmented.py
 
-src/ar7_ch5/_rcmip3_naming.py            NEW   the mapping table
-src/ar7_ch5/runners/__init__.py          EDIT  resolve_rcmip3_bundle helper
+scripts/build_rcmip3_bundle_augmented.py NEW   stages augmented bundle with scen7-* rows
+
+src/ar7_ch5/_rcmip3_naming.py            NEW   the mapping table (protocol names on canonical column)
+src/ar7_ch5/runners/__init__.py          EDIT  resolve_rcmip3_bundle prefers augmented bundle
 src/ar7_ch5/runners/fair.py              EDIT  pass bundle path
 src/ar7_ch5/runners/ciceroscm.py         EDIT  pass bundle path
-src/ar7_ch5/runners/orchestrate.py       no change (consumes ScmRun shape)
+src/ar7_ch5/runners/orchestrate.py       EDIT  attach_pathway_id helper after engine call
 
 src/ar7_ch5/load.py                      EDIT  emit pathway_id + scenario=canonical
 src/ar7_ch5/load_ssp2com.py              EDIT  same
-src/ar7_ch5/load_scenariomip.py          EDIT  same
+src/ar7_ch5/load_scenariomip.py          EDIT  same (canonical = scen7-{cat})
 src/ar7_ch5/load_rcmip3.py               EDIT  emit pathway_id (= scenario)
 
-src/ar7_ch5/experiments/sci_ensemble.py  EDIT  pathway_id filenames + manifest col
+src/ar7_ch5/experiments/sci_ensemble.py  EDIT  pathway_id filenames + manifest col + per-pathway runs
 src/ar7_ch5/experiments/ssp2com.py       EDIT  pathway_id filename
 src/ar7_ch5/experiments/scenariomip_cmip7.py EDIT  pathway_id filename
 src/ar7_ch5/experiments/rcmip3.py        EDIT  pathway_id filename (= scenario)
@@ -152,8 +181,8 @@ src/ar7_ch5/experiments/rcmip3.py        EDIT  pathway_id filename (= scenario)
 src/ar7_ch5/metrics.py                   EDIT  index pathways by pathway_id
 src/ar7_ch5/cache.py                     EDIT  expected names from pathway_id
 
-docs/data_setup.md                       EDIT  RCMIP3 bundle now mandatory
-docs/methods.md                          EDIT  LU / natural-forcings concession
+docs/data_setup.md                       EDIT  RCMIP3 bundle mandatory + augmented build step
+docs/methods.md                          EDIT  mapping + scen7 natural-forcings source
 ar7-ch5-ensemble-brief.md                EDIT  stack table; decisions log
 README.md                                EDIT  engine reference
 
@@ -169,9 +198,9 @@ tests/test_cache.py                      EDIT  pathway_id-based expected names
 loaders do the canonicalisation, downstream consumers read
 `pathway_id`. No hidden translation.
 
-## LU / natural-forcings concession
+## SCI LU / natural-forcings concession
 
-Every chapter pathway in an SSP family ends up with the **bundle's row
+Every SCI pathway in an SSP family ends up with the **bundle's row
 for that family** supplying solar / volcanic / land-use forcings. For
 SCI specifically, all ~600 SSP2-* pathways share the bundle's `ssp245`
 LU + natural forcings, regardless of which IAM produced the pathway.
@@ -182,6 +211,11 @@ from the user's overlay, so the practical impact on warming outcomes is
 modest, but the concession is documented in `docs/methods.md` alongside
 the existing SCI-vintage caveat. The full SCI re-run on the new pin
 provides the empirical magnitude.
+
+The ScenarioMIP CMIP7 set does NOT carry this concession: each
+`scen7-{cat}` pathway gets the GMD-paper natural forcings (from the
+augmented bundle's `volcanic_solar.csv` source) and the bundle's per-
+category land-use rows, both via the protocol-name canonical row.
 
 ## Validation plan
 
@@ -212,5 +246,8 @@ provides the empirical magnitude.
 | # | Decision | Resolution |
 |---|---|---|
 | 1 | SSP1-Baseline mapping | `ssp126` (SSP-family default) |
-| 2 | LU / natural-forcings concession | document in `methods.md`; accept as v1 |
+| 2 | SCI LU / natural-forcings concession | document in `methods.md`; accept as v1 |
 | 3 | Naming approach | **two-column representation** (`scenario` canonical + `pathway_id` chapter); no hidden translation in orchestration |
+| 4 | ScenarioMIP CMIP7 canonical name | `scen7-{cat}` per the RCMIP3 protocol; **not** an SSP-RCP surrogate |
+| 5 | ScenarioMIP CMIP7 natural forcings | scenariomip-paper-plots `volcanic_solar.csv` (Zenodo 20329427), staged into the augmented bundle by `scripts/build_rcmip3_bundle_augmented.py` |
+| 6 | ScenarioMIP CMIP7 emissions baseline | SSP-RCP donor copy per category, overlaid by chapter user emissions |

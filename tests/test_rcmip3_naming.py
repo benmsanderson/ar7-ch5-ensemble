@@ -1,8 +1,8 @@
-"""Unit tests for the chapter-scenario -> RCMIP3-canonical mapping.
+"""Unit tests for the chapter-pathway -> RCMIP3-protocol-name mapping.
 
 Verifies the audit trail an IPCC reviewer would want: every chapter
-scenario family resolves to a documented canonical RCMIP3 name through
-explicit lookups.
+pathway resolves to a documented RCMIP3 protocol name through explicit
+lookups against the protocol scenario catalogue.
 """
 
 from __future__ import annotations
@@ -14,6 +14,8 @@ from ar7_ch5._rcmip3_naming import (
     RCMIP3_CANONICAL_SCENARIOS,
     SCENARIOMIP_TO_CANONICAL,
     SCI_FAMILY_DEFAULT_CANONICAL,
+    SSP2COM_CHAPTER_NAME,
+    SSP2COM_CANONICAL_SURROGATE,
     canonical_for,
 )
 
@@ -21,32 +23,42 @@ from ar7_ch5._rcmip3_naming import (
 @pytest.mark.parametrize(
     "name",
     [
+        # SSP-RCP family.
         "ssp119", "ssp126", "ssp245", "ssp370", "ssp434", "ssp460",
         "ssp534-over", "ssp585",
+        # Idealised.
         "abrupt-2xCO2", "abrupt-4xCO2", "1pctCO2", "piControl",
-        "historical", "hist-CO2",
+        "esm-flat10", "esm-flat7.5", "esm-flat20",
+        # Historical / attribution.
+        "historical", "historical-cmip6", "hist-CO2",
+        # CMIP7 ScenarioMIP categories (protocol names).
+        "scen7-VL", "scen7-L", "scen7-LN", "scen7-M", "scen7-ML",
+        "scen7-H", "scen7-HL",
     ],
 )
-def test_canonical_names_pass_through(name):
+def test_protocol_names_pass_through(name):
     assert name in RCMIP3_CANONICAL_SCENARIOS
     assert canonical_for(name) == name
 
 
-def test_scenariomip_short_labels_map_by_ssp_family():
-    """ScenarioMIP CMIP7 short labels resolve by the SSP family their long
-    scenario identifies with, not by a target-W/m^2 match."""
-    assert canonical_for("VL") == "ssp119"
-    assert canonical_for("L") == "ssp126"
-    assert canonical_for("LN") == "ssp126"
-    assert canonical_for("M") == "ssp245"
-    assert canonical_for("ML") == "ssp245"
-    assert canonical_for("HL") == "ssp585"
-    assert canonical_for("H") == "ssp370"
+def test_scenariomip_short_labels_map_to_scen7_protocol_names():
+    """The GMD-paper short labels (VL, L, LN, M, ML, H, HL) resolve to
+    their RCMIP3 protocol equivalents (``scen7-{cat}``)."""
+    assert canonical_for("VL") == "scen7-VL"
+    assert canonical_for("L") == "scen7-L"
+    assert canonical_for("LN") == "scen7-LN"
+    assert canonical_for("M") == "scen7-M"
+    assert canonical_for("ML") == "scen7-ML"
+    assert canonical_for("H") == "scen7-H"
+    assert canonical_for("HL") == "scen7-HL"
 
 
-def test_ssp2com_maps_to_ssp245():
-    """SSP2-COM anchors to ssp245, matching Charlie Koven's pipeline."""
-    assert canonical_for("SSP2-com") == "ssp245"
+def test_ssp2com_surrogate_documented():
+    """SSP2-COM is the one chapter scenario with no RCMIP3 protocol name;
+    surrogate-mapped to ssp245 and documented in methods.md."""
+    assert SSP2COM_CHAPTER_NAME == "SSP2-com"
+    assert SSP2COM_CANONICAL_SURROGATE == "ssp245"
+    assert canonical_for(SSP2COM_CHAPTER_NAME) == SSP2COM_CANONICAL_SURROGATE
 
 
 @pytest.mark.parametrize(
@@ -64,7 +76,7 @@ def test_ssp2com_maps_to_ssp245():
 )
 def test_sci_family_target_combinations_with_canonical_match(scenario, expected):
     """SCI ``SSPx-NN`` names where the (family, target) pair has a
-    canonical RCMIP3 SSP resolve directly."""
+    canonical RCMIP3 SSP-RCP scenario resolve directly."""
     assert canonical_for(scenario) == expected
 
 
@@ -80,7 +92,7 @@ def test_sci_family_target_combinations_with_canonical_match(scenario, expected)
 )
 def test_sci_family_target_combinations_without_canonical_match(scenario, expected):
     """SCI ``SSPx-NN`` names where (family, target) has no canonical RCMIP3
-    counterpart fall back to the SSP family's default canonical."""
+    counterpart fall back to the SSP family's default."""
     assert canonical_for(scenario) == expected
 
 
@@ -109,11 +121,22 @@ def test_unknown_scenario_falls_back_with_note(capsys):
 
 
 def test_mapping_tables_are_consistent_with_canonical_set():
-    """Every canonical value emitted by the lookup tables is itself a
-    canonical RCMIP3 scenario name, so canonical_for never produces an
-    unknown name."""
+    """Every value emitted by the lookup tables is either a protocol
+    RCMIP3 name (member of :data:`RCMIP3_CANONICAL_SCENARIOS`) or the
+    explicitly documented ``SSP2-com`` surrogate (which IS a protocol
+    name, ``ssp245`` -- the surrogate distinction is about the source
+    scenario, not the target name)."""
     for value in SCENARIOMIP_TO_CANONICAL.values():
         assert value in RCMIP3_CANONICAL_SCENARIOS, value
     for value in SCI_FAMILY_DEFAULT_CANONICAL.values():
         assert value in RCMIP3_CANONICAL_SCENARIOS, value
+    assert SSP2COM_CANONICAL_SURROGATE in RCMIP3_CANONICAL_SCENARIOS
     assert FALLBACK_CANONICAL in RCMIP3_CANONICAL_SCENARIOS
+
+
+def test_protocol_catalogue_includes_full_scen7_set():
+    """All seven ScenarioMIP CMIP7 baselines must be in the protocol
+    catalogue so they pass through unchanged when a loader already uses
+    the canonical name."""
+    for cat in ("VL", "L", "LN", "M", "ML", "H", "HL"):
+        assert f"scen7-{cat}" in RCMIP3_CANONICAL_SCENARIOS
