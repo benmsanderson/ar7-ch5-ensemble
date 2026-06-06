@@ -9,9 +9,13 @@ one canonical command-line entry point per task; notebooks are reserved for
 figures. The full plan, porting map, and conventions are in
 [ar7-ch5-ensemble-brief.md](ar7-ch5-ensemble-brief.md).
 
-> Status: scaffold (milestone 1). The layout and environment are in place; the
-> run, classification and figure logic land in later milestones. Module
-> docstrings say what each file will hold and which milestone fills it.
+> Status: M1-M7 complete (smoke runs, SCI ensemble batch on NAC, vetting /
+> feasibility / classification port, SSP2-COM ingestion + harmoniser,
+> ScenarioMIP CMIP7, RCMIP3 concentration-driven diagnostics). M8 figures
+> is in scaffold + first-figure form -- jupytext-paired figure scripts,
+> YAML-driven configuration, a read-only cache reporter, and `fig01`
+> wired end-to-end. See the milestone list in
+> [ar7-ch5-ensemble-brief.md](ar7-ch5-ensemble-brief.md) section 8.
 
 ## Scenario sets
 
@@ -38,6 +42,16 @@ pixi run python scripts/run_scenarios.py --help
 
 # 4. Run the tests.
 pixi run test
+
+# 5. Run one experiment end-to-end (FaIR-only smoke, ~10 s).
+pixi run python scripts/run_scenarios.py \
+    --experiment ssp2com --models fair --n-members 5
+
+# 6. Run vetting + feasibility + classification on the SCI ensemble (~5 min).
+pixi run python scripts/classify.py --source xlsx
+
+# 7. Build the figures registered in schemes/figures.yaml.
+pixi run python scripts/make_figures.py --all
 ```
 
 ## Engine
@@ -47,12 +61,17 @@ modernised FaIR2 / CICEROSCMPY2 adapters and the strict canonical RCMIP3
 splice path (github.com/openscm/openscm-runner, branch
 `feat/fair2-ciceroscmpy2-adapters-and-runmode-nonfork`), pinned in
 `pixi.toml` until those PRs land on main. This repository is the
-*application*; the runner is the *engine*. Scenarios that aren't RCMIP3-
-canonical (SCI's `SSPx-NN`, ScenarioMIP's `VL`/`L`/.../`H`, SSP2-COM)
-flow through a chapter-side mapping to a canonical RCMIP3 name on the
-`scenario` meta column while the chapter pathway identifier is preserved
-on a parallel `pathway_id` meta column; see
-[docs/engine_upstream_switch.md](docs/engine_upstream_switch.md).
+*application*; the runner is the *engine*. Chapter pathway IDs flow
+through a chapter-side mapping to the matching RCMIP3 protocol name on
+the `scenario` meta column (ScenarioMIP CMIP7 -> `scen7-{cat}`, SCI ->
+`ssp{x}{NN}`, idealised pass-through, SSP2-COM as a documented
+surrogate), while the chapter pathway identifier is preserved on a
+parallel `pathway_id` meta column; see
+[docs/engine_upstream_switch.md](docs/engine_upstream_switch.md). The
+`scen7-*` natural-forcing rows are added at data-setup time by
+`scripts/build_rcmip3_bundle_augmented.py` from
+scenariomip-paper-plots (Zenodo 20329427); see
+[docs/data_setup.md](docs/data_setup.md) section 4a.
 
 ## How emissions reach the models
 
@@ -63,24 +82,67 @@ CMIP7 is harmonised by the CMIP7 pipeline; only SSP2-COM is harmonised here, by
 a light global harmoniser anchored to a published 2023 history. See
 [docs/methods.md](docs/methods.md) for details and the SCI-vintage caveat.
 
+## Building figures
+
+Three CLIs in a chain; each is read-only on the layer below it:
+
+```
+scripts/cache_status.py    reports which ensemble outputs / CSVs are present
+scripts/run_scenarios.py   produces SCM ensemble NetCDFs (per experiment)
+scripts/classify.py        produces classification CSVs (per source)
+scripts/make_figures.py    reads the cached outputs, writes PNG / PDF
+```
+
+`cache_status.py` is the entry point for "what do I need to run before this
+figure works?". For every (experiment, SCM) it lists present / expected
+counts and prints the exact `run_scenarios.py` command beside each missing
+piece. `make_figures.py` calls into the same enumerator and fails early with
+a clear `FileNotFoundError` if a required input is missing, so iteration
+stays fast and the figure layer never silently runs an SCM.
+
+Each figure is a jupytext-paired `notebooks/figXX_*.py` (percent format).
+The `.py` is the tracked source of truth; the `.ipynb` is generated on demand
+and gitignored. Open the `.py` in JupyterLab to use it as a notebook; run
+`python notebooks/figXX_*.py` or `make_figures.py --figure figXX_*` to
+produce the output files. Per-figure spec lives in
+[schemes/figures.yaml](schemes/figures.yaml), shared palettes and DPI / font
+defaults in [schemes/style.yaml](schemes/style.yaml).
+
+Figures land under `outputs/figures/`. Adding a figure is two steps: a new
+`notebooks/figXX_*.py` and a new entry in `schemes/figures.yaml` keyed by
+the same id.
+
 ## Layout
 
 ```
 pixi.toml             single source of truth for the environment
+jupytext.toml         pairing config for notebooks/ figure scripts
 pyproject.toml        installable package metadata
-src/ar7_ch5/          the package (loaders, harmonise, vetting, classification,
-                      runners/, experiments/, metrics, figures)
+src/ar7_ch5/          the package
+  load*.py            per-input loaders (SCI, SSP2-COM, ScenarioMIP, RCMIP3)
+  harmonise.py        light global SSP2-COM harmoniser (anchor to 2023 history)
+  vetting.py          Riahi 2026 Table SI.1
+  feasibility.py      Table SI.2 (feasibility + sustainability)
+  classification.py   Table SI.3 (GW0-GW8) + emissions-based extension
+  metrics.py          warming metrics over the 3-SCM ensemble NetCDFs
+  cache.py            read-only enumerator (expected vs present per experiment)
+  figures.py          config / style / save helpers for figure scripts
+  runners/, experiments/
 scripts/              canonical command-line entry points
   run_scenarios.py    select experiment + models, run the SCMs
-  preprocess_sci.py   SCI xlsx -> CSV
-  preprocess_ssp2com.py
-  classify.py         vetting + feasibility + classification
-  make_figures.py
+  classify.py         vetting + feasibility + sustainability + classification
+  cache_status.py     report present / missing ensemble outputs
+  make_figures.py     dispatch jupytext-paired figure scripts
 docs/                 data_setup.md, running_on_nac.md, methods.md
-schemes/              clustering / partition config (JSON)
-notebooks/            figure-only, thin wrappers over the package
+schemes/              YAML configs
+  figures.yaml        per-figure spec (experiment, source, output formats)
+  style.yaml          shared palettes and DPI / font defaults
+notebooks/            jupytext-paired figure scripts (figXX_*.py tracked,
+                      figXX_*.ipynb gitignored)
 tests/                fixtures + tests (real adapters, no SCM mocking)
 data/                 gitignored; obtain per docs/data_setup.md
+outputs/              gitignored; per-experiment NetCDFs, classification CSVs,
+                      and figures/figXX_*.{png,pdf}
 ```
 
 ## Conventions
