@@ -290,6 +290,7 @@ def _append_manifest(path: Path, result: PathwayResult) -> None:
             {
                 "scm": result.scm,
                 "iam": result.iam,
+                "pathway_id": result.pathway_id,
                 "scenario": result.scenario,
                 "filename": result.filename,
                 "status": result.status,
