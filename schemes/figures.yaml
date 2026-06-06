@@ -18,6 +18,18 @@ fig01_classification:
   show_vetted_only: true
   output_formats: [png, pdf]
 
+fig03_classification_per_scm:
+  # Per-SCM GW0-GW8 classification summary across the three chapter input
+  # sets (SCI, ScenarioMIP CMIP7, SSP2-COM). One column per source; per
+  # column a stacked bar per SCM (plus an xlsx-MAGICC reference stack for
+  # SCI) showing how many pathways land in each Riahi 2026 (Table SI.3)
+  # GW category. Reads outputs/classification_*.csv produced by
+  # scripts/classify.py.
+  title: "GW0-GW8 classification per SCM across chapter input sets"
+  experiment: classification
+  source: per_model
+  output_formats: [png, pdf]
+
 fig04_ssp2com_validation:
   # Reference comparison: our SSP2-COM driving emissions vs Charlie Koven's
   # FaIR-only SSP2-COM pipeline. Reads
