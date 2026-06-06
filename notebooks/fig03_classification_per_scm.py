@@ -1,9 +1,3 @@
-# ---
-# jupyter:
-#   jupytext:
-#     formats: notebooks///py:percent,notebooks///ipynb
-# ---
-
 # %% [markdown]
 # # Figure 03 - GW0-GW8 warming classification per SCM
 #
