@@ -66,6 +66,35 @@ level. The two differences above are not in scope to harmonise away;
 they are intentional consequences of (a) richer SSP2-COM source data
 and (b) a different anchoring choice.
 
+### RCMIP3 canonical-scenario splice and the LU / natural-forcings concession
+
+The upstream openscm-runner adapters require every scenario to splice
+against a canonical RCMIP3 bundle row (Zenodo 20430630) for the historical
+emissions, natural forcings (solar + volcanic) and land-use / irrigation
+forcings. Chapter scenarios that aren't RCMIP3-canonical (SCI's
+`SSPx-NN`, ScenarioMIP CMIP7's `VL`-`H`, SSP2-COM's `SSP2-com`) flow
+through the mapping in `ar7_ch5._rcmip3_naming.canonical_for` -- the
+SCI-family default is the matching RCMIP3 SSP (e.g. SSP1-19 -> ssp119,
+SSP2-* -> ssp245, SSP3-* -> ssp370). The full table and design rationale
+live in [engine_upstream_switch.md](engine_upstream_switch.md).
+
+The chapter-side concession is that every pathway in an SSP family ends
+up driven with the **bundle's row for that family** supplying solar /
+volcanic / land-use forcings -- so all ~600 SSP2-* SCI pathways share the
+bundle's `ssp245` LU + natural forcings regardless of which IAM produced
+the pathway. The original MAGICC SCI runs used SCI-vintage AR6 forcings
+instead. The dominant emissions signal still comes from the user's
+overlay, so the practical impact on warming outcomes is modest, but the
+choice is documented here so any species-level / forcing-level figure
+flags it. A full SCI re-run on the upstream pin gives the empirical
+magnitude.
+
+The output ScmRuns and NetCDFs carry both `scenario` (the canonical
+RCMIP3 name -- the bundle row that supplied the splice) and `pathway_id`
+(the chapter pathway identifier, e.g. `SSP1-19`, `VL`, `SSP2-com`) as
+first-class meta columns, so the audit trail "which bundle row supplied
+the splice for this output?" is answerable from any artefact alone.
+
 ### Vintage note (flag before cross-ensemble comparison)
 
 SCI is harmonised to the AR6 historical vintage (~2015 base, RCMIP), while the

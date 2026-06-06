@@ -67,21 +67,35 @@ scenarios.
 SSP2-COM, the eighth scenario the chapter reports alongside these seven,
 is sourced separately from scenariocompass (see section 2).
 
-## 4. RCMIP3 protocol bundle (Zenodo 20430630)
+## 4. RCMIP3 protocol bundle (Zenodo 20430630; mandatory)
 
-The RCMIP Phase 3 protocol bundle ships three wide-table CSVs (concentrations,
-emissions, forcing) covering the 25 RCMIP3 scenarios -- the ECS / TCR / TCRE
-idealised set (abrupt-2xCO2, abrupt-4xCO2, 1pctCO2 family, piControl), the
-concentration-driven SSP set, and historical attribution variants. v1 of this
-repository uses the concentrations CSV only (for the chapter's concentration-
-driven RCMIP3 diagnostics). Fetch the bundle from
-https://zenodo.org/records/20430630 (single ~37 MB zip), unzip it, and place
-or symlink the `RCMIP3_input_datafiles/` subdirectory under:
+The RCMIP Phase 3 protocol bundle is **mandatory** for the FaIR2 and
+CICEROSCMPY2 adapters under the upstream openscm-runner pin. It supplies
+the historical-emissions splice, the natural forcings (solar + volcanic),
+and the land-use / irrigation forcings for every scenario -- including
+the emissions-driven SCI / SSP2-COM / ScenarioMIP runs that overlay user
+emissions on top of the bundle's history. See
+[engine_upstream_switch.md](engine_upstream_switch.md) for the contract.
+
+Fetch from https://zenodo.org/records/20430630 (single ~37 MB zip).
+Unzip the bundle and stage **both** subdirectories under
+`data/rcmip3_protocol/`:
 
     data/rcmip3_protocol/RCMIP3_input_datafiles/
+    data/rcmip3_protocol/input_datafiles_generation/data/
 
-The loader accepts either the bundle root, the subdir, or the direct CSV.
-On NAC the bundle is already staged at
+`RCMIP3_input_datafiles/` holds the per-kind wide CSVs
+(`rcmip_phase3_concentrations_v2.0.0.csv`,
+`rcmip_phase3_emissions_v2.0.0.csv`,
+`rcmip_phase3_forcing_v2.0.0.csv`).
+`input_datafiles_generation/data/` holds the supplementary forcing CSVs
+the adapters load to wire land-use forcings and irrigation albedo
+(`Forcing_AFOLU_CO2.csv`, `Forcing_irrigation_population_scale.csv`,
+etc.).
+
+The resolver (:func:`ar7_ch5.runners.resolve_rcmip3_bundle`) accepts
+`AR7_RCMIP3_BUNDLE` as an env override, falls back to the in-repo
+default `data/rcmip3_protocol/`, then to the NAC staged location
 `/storage/no-backup-nac/users/bensan/rcmip3_protocol/`.
 
 ## 5. MAGICC v7.5.3 binary (licensed)
