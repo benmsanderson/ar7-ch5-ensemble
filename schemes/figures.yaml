@@ -59,6 +59,17 @@ fig06_per_scm_grid:
   pathways: [VL, L, LN, M, ML, H, HL, SSP2-com]
   output_formats: [png, pdf]
 
+fig07_archetypes:
+  # Strategy × GW-class archetype grid: each cell carries the (Model, Scenario)
+  # selected as the representative pathway for that (emissions-strategy cluster,
+  # GW class) combination.  ESM picks (ScenarioMIP CMIP7) are highlighted.
+  # Reads outputs/archetypes.csv and outputs/clusters.csv produced by
+  # scripts/compute_archetypes.py.
+  title: "Emissions archetypes: representative pathways per (strategy, GW) cell"
+  experiment: archetypes
+  source: archetypes
+  output_formats: [png, pdf]
+
 fig05_scenariomip_extensions:
   # 8-panel diagnostic for ScenarioMIP CMIP7 baselines, reproducing the
   # layout of fig_extensions in scenariomip-paper-plots (Zenodo 20329427,

@@ -321,13 +321,13 @@ from PR A's per-SCM classification CSVs.
 | File | Purpose |
 |---|---|
 | `src/ar7_ch5/archetype_features.py` | Emissions-feature extraction. `compute_features(sci_df, smip_df) -> pd.DataFrame`. Reuses existing IAMC parsers from `ar7_ch5.load` and `ar7_ch5.load_scenariomip`. |
-| `src/ar7_ch5/clustering.py` | `pinned_kmeans`, `merge_small_clusters`, `merge_close_esms`, `match_suffix`. Pure-numerical, sklearn for silhouette only. Unit-testable. |
+| `src/ar7_ch5/clustering.py` | `assign_ce_bin`, `match_suffix`, `fit_clusters`. Pure deterministic threshold logic (no k-means / sklearn); the archetype definitions are stated declaratively in `schemes/clustered.json`. Unit-testable. |
 | `src/ar7_ch5/archetypes.py` | `select_archetypes(clustered_sci, clustered_smip, classification_per_model_sci, scheme) -> pd.DataFrame`. Iterates (strategy, GW_class) cells; preference order ESM-pinned-with-matching-GW > SCI-nearest-to-centroid. |
 | `schemes/clustered.json` | Lifted verbatim from scenariocompass. |
 | `scripts/compute_archetypes.py` | CLI: `--classification-sci ... --classification-smip ... --gw-source magicc`. Writes `outputs/archetypes.csv` and intermediates `outputs/archetype_features.csv`, `outputs/clusters.csv`. |
 | `notebooks/fig07_archetypes.py` | Jupytext-paired figure: strategy x GW grid with chosen `(Model, Scenario)` per cell. |
 | `tests/test_archetype_features.py` | Feature math on small synthetic IAMC frames. |
-| `tests/test_clustering.py` | Pinned-kmeans keeps pinned centroids stationary; `merge_small_clusters` deterministic; `match_suffix` honours priority order. |
+| `tests/test_clustering.py` | `assign_ce_bin` boundaries; `match_suffix` honours priority order; `fit_clusters` labels are deterministic and equal `ce_bin-drawdown-suffix` per pathway. |
 | `tests/test_archetypes.py` | Selection: ESM preference; SCI tie-break by centroid distance. |
 | `tests/test_archetypes_regression.py` | Compare against scenariocompass `data/archetypes.parquet` if staged locally; require >= 90% (Model, Scenario) match. Skipped in CI. |
 
