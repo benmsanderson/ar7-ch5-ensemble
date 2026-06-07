@@ -29,7 +29,11 @@ from pathlib import Path
 # Allow running from repo root without installing.
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from ar7_ch5.archetype_features import load_and_compute_sci, load_and_compute_smip
+from ar7_ch5.archetype_features import (
+    load_and_compute_sci,
+    load_and_compute_smip,
+    load_and_compute_ssp2com,
+)
 from ar7_ch5.archetypes import select_archetypes
 from ar7_ch5.clustering import fit_clusters
 from ar7_ch5.runners import repo_root
@@ -57,6 +61,12 @@ def _parse_args() -> argparse.Namespace:
         help="Path to ScenarioMIP emissions CSV.",
     )
     p.add_argument(
+        "--ssp2com-xlsx",
+        type=Path,
+        default=None,
+        help="Path to SSP2-COM world-total xlsx (default: data/ssp2com/ssp2-com_world_total.xlsx).",
+    )
+    p.add_argument(
         "--classification-sci",
         type=Path,
         default=None,
@@ -67,6 +77,12 @@ def _parse_args() -> argparse.Namespace:
         type=Path,
         default=None,
         help="Per-model classification CSV for ScenarioMIP (outputs/classification_per_model_scenariomip.csv).",
+    )
+    p.add_argument(
+        "--classification-ssp2com",
+        type=Path,
+        default=None,
+        help="Per-model classification CSV for SSP2-COM (outputs/classification_per_model_ssp2com.csv).",
     )
     p.add_argument(
         "--gw-source",
@@ -121,6 +137,11 @@ def _resolve_paths(args: argparse.Namespace) -> dict[str, Path]:
     clf_smip = args.classification_smip or root / "outputs" / "classification_per_model_scenariomip.csv"
     scheme_path = args.scheme or root / "schemes" / "clustered.json"
     output_dir = args.output_dir or root / "outputs"
+    ssp2com_xlsx = args.ssp2com_xlsx or root / "data" / "ssp2com" / "ssp2-com_world_total.xlsx"
+    clf_ssp2com = (
+        args.classification_ssp2com
+        or root / "outputs" / "classification_per_model_ssp2com.csv"
+    )
 
     for label, path in [
         ("--sci-xlsx", sci_xlsx),
@@ -140,6 +161,8 @@ def _resolve_paths(args: argparse.Namespace) -> dict[str, Path]:
         "clf_smip": clf_smip,
         "scheme": scheme_path,
         "output_dir": output_dir,
+        "ssp2com_xlsx": ssp2com_xlsx,
+        "clf_ssp2com": clf_ssp2com,
     }
 
 
@@ -164,10 +187,24 @@ def main() -> None:
     smip_features = load_and_compute_smip(paths["smip_csv"])
     print(f"  ScenarioMIP: {len(smip_features)} pathways", flush=True)
 
+    import pandas as pd
+
+    # SSP2-COM is a single reference pathway; include it when the xlsx is present.
+    ssp2com_xlsx = paths.get("ssp2com_xlsx")
+    if ssp2com_xlsx is not None and ssp2com_xlsx.exists():
+        print("Computing SSP2-COM features ...", flush=True)
+        ssp2com_features = load_and_compute_ssp2com(ssp2com_xlsx)
+        print(f"  SSP2-COM: {len(ssp2com_features)} pathway(s)", flush=True)
+        reference_features = pd.concat(
+            [smip_features, ssp2com_features], ignore_index=True
+        )
+    else:
+        print("  (SSP2-COM xlsx not found; skipping)", flush=True)
+        reference_features = smip_features
+
     # Save feature CSV
     features_path = paths["output_dir"] / "archetype_features.csv"
-    import pandas as pd
-    pd.concat([sci_features, smip_features], ignore_index=True).to_csv(
+    pd.concat([sci_features, reference_features], ignore_index=True).to_csv(
         features_path, index=False
     )
     print(f"  → {features_path}", flush=True)
@@ -175,7 +212,7 @@ def main() -> None:
     # ---- 2. Clustering ----
     scheme = json.loads(paths["scheme"].read_text())
     print("Clustering ...", flush=True)
-    clustered = fit_clusters(sci_features, smip_features, scheme)
+    clustered = fit_clusters(sci_features, reference_features, scheme)
     print(f"  {clustered['cluster_label'].nunique()} strategy clusters found", flush=True)
 
     clusters_path = paths["output_dir"] / "clusters.csv"
@@ -184,10 +221,14 @@ def main() -> None:
 
     # ---- 3. Archetype selection ----
     print(f"Selecting archetypes (gw-source={args.gw_source}) ...", flush=True)
+    reference_clf = {"smip": paths["clf_smip"]}
+    if paths.get("clf_ssp2com") and paths["clf_ssp2com"].exists():
+        reference_clf["ssp2com"] = paths["clf_ssp2com"]
     archetypes = select_archetypes(
         clustered,
         classification_csv=paths["clf_sci"],
         gw_source=args.gw_source,
+        reference_classification_csvs=reference_clf,
     )
     print(f"  {len(archetypes)} archetype cells populated", flush=True)
 
@@ -196,9 +237,9 @@ def main() -> None:
     print(f"  → {archetypes_path}", flush=True)
 
     # Summary
-    n_smip = (archetypes["source"] == "smip").sum()
+    n_ref = archetypes["source"].isin(["smip", "ssp2com"]).sum()
     n_sci = (archetypes["source"] == "sci").sum()
-    print(f"\nDone.  {n_smip} ESM + {n_sci} SCI archetypes selected.")
+    print(f"\nDone.  {n_ref} reference + {n_sci} SCI archetypes selected.")
 
 
 if __name__ == "__main__":

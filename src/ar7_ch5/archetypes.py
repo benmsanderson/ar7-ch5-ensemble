@@ -5,21 +5,23 @@ Ported from scenariocompass notebook 05_archetypes.
 For each (strategy_label, GW_class) cell, selects the representative
 archetype pathway using the following preference order:
 
-1. A ScenarioMIP/SSP2-COM (ESM) pathway whose strategy cluster matches
-   **and** whose GW class (from the per-model classification CSV) matches.
+1. A reference pathway (ScenarioMIP CMIP7 or SSP2-COM) whose strategy
+   cluster matches **and** whose GW class (from its own classification
+   CSV) matches.  SSP2-COM is preferred over ScenarioMIP, then ties break
+   by scenario name.
 2. The SCI pathway closest to the cluster centroid in standardised
    feature space.
 3. Cell is left empty if neither condition is satisfied.
 
 Output columns
 --------------
-strategy_label  Full composite cluster label (e.g. ``CC1000-nz-cdr+ch4``).
+strategy_label  Full composite cluster label (e.g. ``CC1000-nz-cdr``).
 gw_class        GW category (``GW0`` … ``GW8``).
-Model           IAM model name or ``'scenariomip'``.
+Model           IAM model name, ``'scenariomip'`` or ``'ssp2com'``.
 Scenario        Scenario / pathway identifier.
-source          ``'sci'`` or ``'smip'``.
-selection_rule  ``'esm_gw_match'`` or ``'sci_nearest_centroid'``.
-dist_to_centroid  Euclidean distance in standardised space (NaN for ESM picks).
+source          ``'sci'``, ``'smip'`` or ``'ssp2com'``.
+selection_rule  ``'reference_match'`` or ``'sci_nearest_centroid'``.
+dist_to_centroid  Euclidean distance in standardised space (NaN for reference picks).
 """
 
 from __future__ import annotations
@@ -84,6 +86,7 @@ def select_archetypes(
     classification_csv: str | Path,
     *,
     gw_source: GW_SOURCE = "magicc",
+    reference_classification_csvs: dict[str, str | Path] | None = None,
 ) -> pd.DataFrame:
     """Select one representative archetype per (strategy_label, GW_class) cell.
 
@@ -94,11 +97,17 @@ def select_archetypes(
         ``cluster_label``, ``source``, ``Model``, ``Scenario``, and
         ``centroid_*`` columns for each of :data:`CLUSTER_FEATURES`.
     classification_csv
-        Path to a per-model classification CSV produced by
+        Path to the SCI per-model classification CSV produced by
         ``scripts/classify.py``.  The ``gw_source`` SCM's rows are used.
     gw_source
         Which SCM's GW labels to use for GW-class matching and
         representative selection.
+    reference_classification_csvs
+        Optional mapping ``{source: csv_path}`` of classification CSVs for
+        the reference pathways (e.g. ``{"smip": ..., "ssp2com": ...}``).
+        When a reference pathway shares a cell's strategy cluster and GW
+        class, it is chosen as the representative in preference to any SCI
+        pathway.
 
     Returns
     -------
@@ -107,9 +116,17 @@ def select_archetypes(
     """
     gw_df = _load_classification(classification_csv, gw_source)
 
+    # Reference pathways (ScenarioMIP / SSP2-COM) carry their own GW labels.
+    ref_frames = [gw_df]
+    for ref_csv in (reference_classification_csvs or {}).values():
+        ref_frames.append(_load_classification(ref_csv, gw_source))
+    gw_all = pd.concat(ref_frames, ignore_index=True).drop_duplicates(
+        subset=["Model", "Scenario"]
+    )
+
     # Attach GW class to the clustered frame
     merged = clustered.merge(
-        gw_df.rename(columns={"category": "gw_class"}),
+        gw_all.rename(columns={"category": "gw_class"}),
         on=["Model", "Scenario"],
         how="left",
     )
@@ -125,6 +142,9 @@ def select_archetypes(
     def _standardise(values: np.ndarray) -> np.ndarray:
         return (np.asarray(values, dtype=float) - feat_mean) / feat_std
 
+    # Reference-source preference: SSP2-COM first, then ScenarioMIP.
+    _ref_priority = {"ssp2com": 0, "smip": 1}
+
     records: list[dict] = []
 
     strategy_labels = merged["cluster_label"].dropna().unique()
@@ -138,18 +158,21 @@ def select_archetypes(
             if matching.empty:
                 continue
 
-            # Preference 1: ESM with matching GW class
-            esm_match = matching[matching["source"] == "smip"]
-            if not esm_match.empty:
-                row = esm_match.iloc[0]
+            # Preference 1: a reference pathway (SSP2-COM, then ScenarioMIP)
+            ref_match = matching[matching["source"].isin(_ref_priority)]
+            if not ref_match.empty:
+                ref_match = ref_match.assign(
+                    _prio=ref_match["source"].map(_ref_priority)
+                ).sort_values(["_prio", "Scenario"])
+                row = ref_match.iloc[0]
                 records.append(
                     {
                         "strategy_label": strategy,
                         "gw_class": gw,
                         "Model": row["Model"],
                         "Scenario": row["Scenario"],
-                        "source": "smip",
-                        "selection_rule": "esm_gw_match",
+                        "source": row["source"],
+                        "selection_rule": "reference_match",
                         "dist_to_centroid": float("nan"),
                     }
                 )

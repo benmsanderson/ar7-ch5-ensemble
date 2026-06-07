@@ -1,9 +1,3 @@
-# ---
-# jupyter:
-#   jupytext:
-#     formats: notebooks///py:percent,notebooks///ipynb
-# ---
-
 # %% [markdown]
 # # Figure 01 - SCI 2025 warming classification distribution
 #
@@ -28,7 +22,7 @@ import pandas as pd
 
 from ar7_ch5 import figures
 from ar7_ch5.cache import status_for
-from ar7_ch5.classification import GW_ORDER
+from ar7_ch5.classification import load_gw_scheme
 from ar7_ch5.runners import repo_root
 
 FIGURE_ID = "fig01_classification"
@@ -40,6 +34,11 @@ FIGURE_ID = "fig01_classification"
 cfg = figures.load_config(FIGURE_ID)
 style = figures.load_style()
 figures.apply_style(style)
+
+# Warming taxonomy this figure is classified under (declared in figures.yaml).
+gw_scheme = load_gw_scheme(cfg.get("gw_scheme", "si3"))
+GW_ORDER = list(gw_scheme.category_order)
+gw_colors = {**style.gw_colors, **gw_scheme.colors}
 
 source = cfg["source"]
 csv_path = repo_root() / "outputs" / f"classification_{source}.csv"
@@ -85,7 +84,7 @@ categories = list(GW_ORDER)
 n = len(categories)
 positions = np.arange(n)
 width = 0.4 if show_vetted else 0.7
-colors = [style.gw_colors.get(c, "#888888") for c in categories]
+colors = [gw_colors.get(c, "#888888") for c in categories]
 
 fig, ax = plt.subplots(figsize=tuple(style.fig_size_inches))
 if show_vetted:

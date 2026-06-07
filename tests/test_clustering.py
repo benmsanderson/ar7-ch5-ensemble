@@ -75,6 +75,50 @@ def test_match_suffix_priority_order():
 
 
 # ---------------------------------------------------------------------------
+# match_suffix: dominant mode + merge + residual_label
+# ---------------------------------------------------------------------------
+
+_DOMINANT_RULES = {
+    "mode": "dominant",
+    "merge": {"deepcdr": "cdr"},
+    "residual_label": "none",
+    "display_order": ["cdr", "deepcdr", "ch4"],
+    "rules": _RULES["rules"],
+}
+
+
+def test_match_suffix_dominant_single_flag():
+    """Dominant mode returns only the highest-priority firing flag."""
+    feats = {"cdr_fraction": 0.35, "ch4_reduction": 0.3}  # both cdr and ch4 fire
+    assert match_suffix(feats, _DOMINANT_RULES) == "cdr"
+
+
+def test_match_suffix_dominant_merge_family():
+    """deepcdr is merged into the cdr family in dominant mode."""
+    feats = {"cdr_fraction": 0.6, "ch4_reduction": 0.9}
+    assert match_suffix(feats, _DOMINANT_RULES) == "cdr"
+
+
+def test_match_suffix_dominant_residual_label():
+    """Custom residual_label is returned when nothing fires."""
+    feats = {"cdr_fraction": 0.1, "ch4_reduction": 0.9}
+    assert match_suffix(feats, _DOMINANT_RULES) == "none"
+
+
+def test_match_suffix_additive_merge_dedup():
+    """Additive mode applies merge and de-duplicates families."""
+    rules = {
+        "mode": "additive",
+        "merge": {"deepcdr": "cdr"},
+        "display_order": ["cdr", "deepcdr", "ch4"],
+        "rules": _RULES["rules"],
+    }
+    feats = {"cdr_fraction": 0.6, "ch4_reduction": 0.3}  # deepcdr + ch4
+    assert match_suffix(feats, rules) == "cdr+ch4"
+
+
+
+# ---------------------------------------------------------------------------
 # fit_clusters (deterministic, declarative)
 # ---------------------------------------------------------------------------
 
@@ -167,3 +211,35 @@ def test_fit_clusters_centroid_is_group_mean():
         for f in CLUSTER_FEATURES + ["cum_co2_afolu"]:
             expected = grp[f].mean()
             np.testing.assert_allclose(grp[f"centroid_{f}"].values, expected)
+
+
+def test_fit_clusters_occupancy_floor_folds_into_base():
+    """Labels below min_cluster_size fold into the cell's residual 'base'."""
+    sci = _make_features(60, "sci", ce=500.0)
+    smip = _make_features(4, "smip", ce=500.0)
+    scheme = _minimal_scheme()
+    scheme["suffix_rules"] = {
+        "mode": "dominant",
+        "residual_label": "base",
+        "display_order": ["cdr", "ch4"],
+        "rules": _RULES["rules"],
+    }
+
+    no_floor = fit_clusters(sci.copy(), smip.copy(), scheme)
+    scheme_floored = {**scheme, "min_cluster_size": 1000}  # forces everything to base
+    floored = fit_clusters(sci.copy(), smip.copy(), scheme_floored)
+
+    # With an unreachable floor, every non-base strategy collapses to base.
+    assert floored["cluster_label"].nunique() <= no_floor["cluster_label"].nunique()
+    suffixes = floored["cluster_label"].str.split("-").str[-1].unique()
+    assert set(suffixes) == {"base"}
+
+
+def test_fit_clusters_floor_preserves_pathway_count():
+    """Folding never drops pathways, only relabels them."""
+    sci = _make_features(60, "sci", ce=500.0)
+    smip = _make_features(4, "smip", ce=500.0)
+    scheme = {**_minimal_scheme(), "min_cluster_size": 25}
+    out = fit_clusters(sci, smip, scheme)
+    assert len(out) == 64
+

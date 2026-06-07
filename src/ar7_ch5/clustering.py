@@ -9,13 +9,17 @@ deterministic function** of the per-pathway features computed in
 
 * ``ce_bin``         threshold bucket of ``cum_co2_net_to_nz``
 * ``drawdown_band``  precomputed per pathway (``pos`` / ``nz`` / ``over``)
-* ``suffix``         composite of the ``suffix_rules`` (each a threshold
+* ``suffix``         the pathway's dominant strategy, picked by a priority
+                     cascade over the ``suffix_rules`` (each a threshold
                      test on a single feature)
 
-The exploratory k-means analysis that originally *chose* those thresholds
-lives in the scenariocompass repository; here the archetype definitions are
-simply stated declaratively, so labelling is fast, reproducible (no random
-seed) and self-documenting.
+The resulting list is kept short and communicable by two declarative knobs
+in ``schemes/clustered.json`` — ``suffix_rules.mode`` (``"dominant"`` =
+one strategy per pathway) and ``min_cluster_size`` (an occupancy floor that
+folds rare archetypes into their cell's residual ``base`` label).  No
+clustering / random seed is involved, so the count is tuned entirely from
+JSON.  The exploratory k-means analysis that originally *chose* these
+thresholds lives in the scenariocompass repository.
 
 Public API
 ----------
@@ -83,36 +87,67 @@ _OPS: dict[str, Any] = {
 }
 
 
+def _rule_fires(rule: dict, feature_values: dict[str, float]) -> bool:
+    """True if every condition of ``rule`` holds for ``feature_values``."""
+    return all(
+        _OPS[cond["op"]](
+            feature_values.get(cond["feature"], float("nan")), cond["threshold"]
+        )
+        for cond in rule.get("conditions", [])
+    )
+
+
 def match_suffix(
     feature_values: dict[str, float],
     suffix_rules: dict[str, Any],
 ) -> str:
-    """Return a composite suffix string for a single pathway.
+    """Return the strategy suffix string for a single pathway.
 
     ``feature_values`` maps feature name → scalar value for one pathway.
     ``suffix_rules`` is the ``suffix_rules`` block from
-    ``schemes/clustered.json``.
+    ``schemes/clustered.json``.  All behaviour is declared in that block:
 
-    Priority order is given by ``display_order``; each rule is included in
-    the suffix if **all** its conditions are satisfied.  Returns ``"base"``
-    if no rule fires.
+    ``mode``
+        ``"dominant"`` (default) returns the single highest-priority flag
+        that fires — yielding one strategy per pathway, which is far easier
+        to communicate.  ``"additive"`` returns every firing flag joined by
+        ``"+"`` (the historical behaviour).
+    ``display_order``
+        Priority order of the rules.  In ``"dominant"`` mode the first
+        firing rule wins; in ``"additive"`` mode it sets the join order.
+    ``merge``
+        Optional ``{flag: family}`` map applied after a flag is selected,
+        collapsing related strategies (e.g. ``deepcdr`` → ``cdr``).
+    ``residual_label``
+        Returned when no rule fires (default ``"base"``).
+
+    Each rule fires when **all** its conditions are satisfied; a ``NaN``
+    feature never satisfies a threshold.
     """
     display_order: list[str] = suffix_rules.get("display_order", [])
     rules: dict[str, dict] = suffix_rules.get("rules", {})
-    active: list[str] = []
-    for name in display_order:
-        rule = rules.get(name)
-        if rule is None:
-            continue
-        conditions = rule.get("conditions", [])
-        if all(
-            _OPS[cond["op"]](
-                feature_values.get(cond["feature"], float("nan")), cond["threshold"]
-            )
-            for cond in conditions
-        ):
-            active.append(name)
-    return "+".join(active) if active else "base"
+    merge: dict[str, str] = suffix_rules.get("merge", {})
+    residual: str = suffix_rules.get("residual_label", "base")
+    mode: str = suffix_rules.get("mode", "additive")
+
+    active: list[str] = [
+        name
+        for name in display_order
+        if name in rules and _rule_fires(rules[name], feature_values)
+    ]
+    if not active:
+        return residual
+
+    if mode == "dominant":
+        return merge.get(active[0], active[0])
+
+    # additive: collapse via merge map, de-duplicate while preserving order
+    merged: list[str] = []
+    for name in active:
+        fam = merge.get(name, name)
+        if fam not in merged:
+            merged.append(fam)
+    return "+".join(merged)
 
 
 # ---------------------------------------------------------------------------
@@ -151,16 +186,29 @@ def fit_clusters(
     -------
     DataFrame with all input columns plus:
       ``ce_bin``          CE-bin label (CC1000 / CC1500 / CC3000 / CC3000+)
-      ``cluster_label``   Full composite label, e.g. ``CC1000-nz-cdr+ch4``
+      ``cluster_label``   Full composite label, e.g. ``CC1000-nz-cdr``
       ``centroid_*``      Group-mean feature values for the pathway's label
 
     The ``centroid_*`` columns give, for each pathway, the mean of every
     pathway sharing its ``cluster_label`` (computed over the combined
     SCI + ScenarioMIP set), providing a deterministic representative point.
+
+    Two declarative knobs in ``scheme`` shape the resulting list so it stays
+    short and communicable, with no clustering step:
+
+    * ``suffix_rules.mode`` — ``"dominant"`` gives one strategy per pathway
+      (see :func:`match_suffix`).
+    * ``min_cluster_size`` — occupancy floor.  Any archetype with fewer than
+      this many pathways has its strategy folded into the cell residual
+      (``suffix_rules.residual_label``), so rare niche labels disappear into
+      the "base" archetype of their (CE-bin, drawdown) cell.  Set to ``0`` /
+      omit to keep every label.
     """
     ce_cfg = scheme["ce_bins"]
     cluster_features: list[str] = scheme["cluster_features"]
     suffix_rules = scheme["suffix_rules"]
+    min_cluster_size = int(scheme.get("min_cluster_size", 0) or 0)
+    residual_label = suffix_rules.get("residual_label", "base")
 
     centroid_features = cluster_features + ["cum_co2_afolu"]
 
@@ -174,13 +222,29 @@ def fit_clusters(
     )
 
     # --- Composite label, evaluated per pathway on its own features ---
-    def _label(row: pd.Series) -> str:
-        suffix = match_suffix(
+    def _suffix(row: pd.Series) -> str:
+        return match_suffix(
             {f: row.get(f, float("nan")) for f in cluster_features}, suffix_rules
         )
-        return f"{row['ce_bin']}-{row['drawdown_band']}-{suffix}"
 
-    combined["cluster_label"] = combined.apply(_label, axis=1)
+    combined["_cell"] = (
+        combined["ce_bin"].astype(str) + "-" + combined["drawdown_band"].astype(str)
+    )
+    combined["_suffix"] = combined.apply(_suffix, axis=1)
+    combined["cluster_label"] = combined["_cell"] + "-" + combined["_suffix"]
+
+    # --- Occupancy floor: fold rare strategies into the cell residual ---
+    if min_cluster_size > 1:
+        counts = combined["cluster_label"].value_counts()
+        rare = set(counts[counts < min_cluster_size].index)
+        is_rare = combined["cluster_label"].isin(rare) & (
+            combined["_suffix"] != residual_label
+        )
+        combined.loc[is_rare, "cluster_label"] = (
+            combined.loc[is_rare, "_cell"] + "-" + residual_label
+        )
+
+    combined = combined.drop(columns=["_cell", "_suffix"])
 
     # --- Deterministic centroids: group mean per label ---
     group_means = combined.groupby("cluster_label")[centroid_features].transform("mean")

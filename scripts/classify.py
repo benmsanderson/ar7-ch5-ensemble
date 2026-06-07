@@ -43,6 +43,7 @@ from ar7_ch5.classification import (
     GW_ORDER,
     classify_from_metrics,
     classify_warming,
+    load_gw_scheme,
 )
 from ar7_ch5.feasibility import apply_feasibility, apply_sustainability
 from ar7_ch5.load import load_sci_iamc_global
@@ -120,6 +121,14 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--gw-scheme",
+        default="si3",
+        help="Warming-classification scheme: a bare name resolved under "
+        "schemes/gw/ (e.g. 'si3', the canonical Table SI.3 taxonomy) or an "
+        "explicit .json path. Lets alternative GW taxonomies be swapped in "
+        "during writing.",
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=None,
@@ -129,7 +138,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _classify_from_xlsx(df: pd.DataFrame) -> pd.DataFrame:
+def _classify_from_xlsx(df: pd.DataFrame, scheme=None) -> pd.DataFrame:
     """Vetting + feasibility + sustainability + classification (xlsx path)."""
     print(f"Loaded {len(df['Model'].unique())} IAMs across "
           f"{len(df[['Model','Scenario']].drop_duplicates())} scenarios.")
@@ -140,7 +149,7 @@ def _classify_from_xlsx(df: pd.DataFrame) -> pd.DataFrame:
     print(f"  {vc}")
 
     print("Classification (MAGICC percentiles in xlsx)...")
-    warming = classify_warming(df)
+    warming = classify_warming(df, scheme=scheme)
     cc = (
         warming["category"].value_counts()
         .reindex(GW_ORDER).dropna().astype(int).to_dict()
@@ -207,7 +216,7 @@ def _classify_non_sci(args) -> pd.DataFrame:
         source=args.source,
         input_source=args.input_source,
     )
-    warming = classify_from_metrics(metrics).reset_index()
+    warming = classify_from_metrics(metrics, scheme=getattr(args, "gw_scheme_obj", None)).reset_index()
     warming = warming.rename(columns={"model": "Model", "scenario": "Scenario"})
     # ``Model`` carries the input_source name on this path (see
     # ``metrics.load_pathway_outputs``); the real chapter identity is
@@ -254,7 +263,7 @@ def _classify_from_metrics(df: pd.DataFrame, args) -> pd.DataFrame:
         source=args.source,
         input_source=args.input_source,
     )
-    warming = classify_from_metrics(metrics).reset_index()
+    warming = classify_from_metrics(metrics, scheme=getattr(args, "gw_scheme_obj", None)).reset_index()
     # Metrics index uses (model, pathway_id, [climate_model]); the rest of
     # the M3 pipeline expects (Model, Scenario) IAMC casing.
     warming = warming.rename(columns={"model": "Model", "pathway_id": "Scenario"})
@@ -300,6 +309,8 @@ def _classify_from_metrics(df: pd.DataFrame, args) -> pd.DataFrame:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    args.gw_scheme_obj = load_gw_scheme(args.gw_scheme)
+    print(f"GW scheme: {args.gw_scheme_obj.name} (--gw-scheme {args.gw_scheme})")
     if args.outputs_dir is None:
         args.outputs_dir = DEFAULT_OUTPUTS_DIR[args.input_source]
     if args.input_source != "sci" and args.source == "xlsx":
@@ -324,7 +335,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Loading {args.input.name}...")
         df = load_sci_iamc_global(args.input)
         if args.source == "xlsx":
-            combined = _classify_from_xlsx(df)
+            combined = _classify_from_xlsx(df, scheme=args.gw_scheme_obj)
         else:
             combined = _classify_from_metrics(df, args)
     else:

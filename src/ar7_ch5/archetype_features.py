@@ -70,6 +70,14 @@ _SMIP_CH4 = "CH4"
 _SMIP_SULFUR = "Sulfur"
 
 # ---------------------------------------------------------------------------
+# SSP2-COM source variable names (canonical IAMC, see ar7_ch5.load_ssp2com)
+# ---------------------------------------------------------------------------
+_SSP2COM_EIP = "Emissions|CO2|MAGICC Fossil and Industrial"
+_SSP2COM_AFOLU = "Emissions|CO2|MAGICC AFOLU"
+_SSP2COM_CH4 = "Emissions|CH4"
+_SSP2COM_SULFUR = "Emissions|Sulfur"
+
+# ---------------------------------------------------------------------------
 # Core helpers
 # ---------------------------------------------------------------------------
 
@@ -320,6 +328,49 @@ def compute_features_smip(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
+# SSP2-COM feature extraction
+# ---------------------------------------------------------------------------
+
+def compute_features_ssp2com(df: pd.DataFrame) -> pd.DataFrame:
+    """Compute archetype features for the SSP2-COM world-total pathway.
+
+    ``df`` is the long-format timeseries returned by
+    ``load_ssp2com_world_total(...).timeseries().reset_index()``: it has a
+    ``variable`` column of canonical IAMC names plus one column per
+    annual ``datetime`` timestamp (2023-2100).
+
+    No CCS variable is present, so ``cdr_fraction`` is set to 0 (as for
+    ScenarioMIP).  Returns a single-row DataFrame with the same columns as
+    :func:`compute_features_sci`, tagged ``source='ssp2com'``.
+    """
+    time_cols = [c for c in df.columns if hasattr(c, "year")]
+    years = np.array([c.year for c in time_cols], dtype=float)
+
+    var_map: dict[str, np.ndarray] = {}
+    for _, row in df.iterrows():
+        var = row["variable"]
+        if var in (_SSP2COM_EIP, _SSP2COM_AFOLU, _SSP2COM_CH4, _SSP2COM_SULFUR):
+            var_map[var] = row[time_cols].values.astype(float)
+
+    required = (_SSP2COM_EIP, _SSP2COM_AFOLU, _SSP2COM_CH4, _SSP2COM_SULFUR)
+    if not all(v in var_map for v in required):
+        return _make_output_df([])
+
+    feat = _compute_pathway_features(
+        eip=var_map[_SSP2COM_EIP],
+        afolu=var_map[_SSP2COM_AFOLU],
+        ccs=None,  # no CCS in the SSP2-COM world-total file
+        ch4=var_map[_SSP2COM_CH4],
+        sulfur=var_map[_SSP2COM_SULFUR],
+        years=years,
+    )
+    feat["Model"] = "ssp2com"
+    feat["Scenario"] = "SSP2-com"
+    feat["source"] = "ssp2com"
+    return _make_output_df([feat])
+
+
+# ---------------------------------------------------------------------------
 # High-level loaders
 # ---------------------------------------------------------------------------
 
@@ -360,6 +411,15 @@ def load_and_compute_smip(smip_csv_path: str | Path) -> pd.DataFrame:
     """Load ScenarioMIP emissions CSV and compute archetype features."""
     df = pd.read_csv(Path(smip_csv_path))
     return compute_features_smip(df)
+
+
+def load_and_compute_ssp2com(ssp2com_xlsx_path: str | Path) -> pd.DataFrame:
+    """Load the SSP2-COM world-total xlsx and compute archetype features."""
+    from .load_ssp2com import load_ssp2com_world_total
+
+    run = load_ssp2com_world_total(Path(ssp2com_xlsx_path))
+    df = run.timeseries().reset_index()
+    return compute_features_ssp2com(df)
 
 
 # ---------------------------------------------------------------------------

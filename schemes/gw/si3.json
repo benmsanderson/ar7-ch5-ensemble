@@ -1,0 +1,88 @@
+{
+    "name": "SI.3 warming categories (Riahi et al. 2026)",
+    "description": "Global-warming (GW0-GW8) classification of the SCI 2025 ensemble, reproducing Table SI.3 of Riahi et al. (2026). An ordered first-match cascade of threshold tests on peak warming (PW) and end-of-century warming (EoCW) at the 50th and 67th percentiles, plus an end-of-century declining flag. The first rule whose conditions all hold wins; within a rule the first matching subcategory (empty `conditions` = catch-all) is assigned. A pathway with a missing PW50 is left `unclassified`. Thresholds are the canonical SI.3 boundaries (1.5/1.6/1.7/2.0/2.5/3.0/3.5 K) and are pinned by the classification regression test.",
+    "metrics": [
+        "peak_warming_50",
+        "peak_warming_67",
+        "eoc_warming_50",
+        "eoc_warming_67",
+        "declining"
+    ],
+    "required": ["peak_warming_50"],
+    "default_category": "unclassified",
+    "rules": [
+        {
+            "category": "GW0",
+            "conditions": [{"feature": "peak_warming_50", "op": "<", "threshold": 1.5}]
+        },
+        {
+            "category": "GW1",
+            "conditions": [{"feature": "peak_warming_50", "op": "<", "threshold": 1.6}]
+        },
+        {
+            "category": "GW2",
+            "conditions": [{"feature": "peak_warming_50", "op": "<", "threshold": 1.7}],
+            "subcategories": [
+                {"label": "GW2a", "conditions": [{"feature": "eoc_warming_50", "op": "<", "threshold": 1.5}]},
+                {"label": "GW2b", "conditions": []}
+            ]
+        },
+        {
+            "category": "GW3",
+            "comment": "Likely below 2C: peak 67th percentile under 2.0.",
+            "conditions": [{"feature": "peak_warming_67", "op": "<", "threshold": 2.0}],
+            "subcategories": [
+                {"label": "GW3a", "conditions": [{"feature": "eoc_warming_50", "op": "<", "threshold": 1.5}]},
+                {"label": "GW3b", "conditions": []}
+            ]
+        },
+        {
+            "category": "GW4",
+            "conditions": [{"feature": "peak_warming_50", "op": "<", "threshold": 2.0}],
+            "subcategories": [
+                {"label": "GW4-I", "conditions": [{"feature": "eoc_warming_50", "op": "<", "threshold": 1.7}]},
+                {"label": "GW4-II", "conditions": []}
+            ]
+        },
+        {
+            "category": "GW5",
+            "conditions": [{"feature": "peak_warming_50", "op": "<", "threshold": 2.5}],
+            "subcategories": [
+                {"label": "GW5-DEC", "conditions": [{"feature": "declining", "op": "==", "threshold": true}]},
+                {"label": "GW5-Non-DEC", "conditions": []}
+            ]
+        },
+        {
+            "category": "GW6",
+            "conditions": [{"feature": "peak_warming_50", "op": "<", "threshold": 3.0}]
+        },
+        {
+            "category": "GW7",
+            "conditions": [{"feature": "peak_warming_50", "op": "<", "threshold": 3.5}]
+        },
+        {
+            "category": "GW8",
+            "conditions": [{"feature": "peak_warming_50", "op": ">=", "threshold": 3.5}]
+        }
+    ],
+    "category_order": [
+        "GW0", "GW1", "GW2", "GW3", "GW4",
+        "GW5", "GW6", "GW7", "GW8", "unclassified"
+    ],
+    "colors": {
+        "GW0": "#1a237e",
+        "GW1": "#1565c0",
+        "GW2": "#2196f3",
+        "GW2a": "#64b5f6",
+        "GW2b": "#90caf9",
+        "GW3": "#26a69a",
+        "GW3a": "#4db6ac",
+        "GW3b": "#80cbc4",
+        "GW4": "#fdd835",
+        "GW5": "#ff9800",
+        "GW6": "#f4511e",
+        "GW7": "#c62828",
+        "GW8": "#4a148c",
+        "unclassified": "#9e9e9e"
+    }
+}

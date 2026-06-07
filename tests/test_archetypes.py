@@ -113,9 +113,9 @@ def test_select_archetypes_esm_preferred(tmp_path):
     clf_path.write_text(csv_content)
 
     result = select_archetypes(clustered, clf_path, gw_source="magicc")
-    # Rows with selection_rule == 'esm_gw_match' should have source == 'smip'
-    esm_matches = result[result["selection_rule"] == "esm_gw_match"]
-    assert (esm_matches["source"] == "smip").all()
+    # Rows with selection_rule == 'reference_match' should have a reference source
+    esm_matches = result[result["selection_rule"] == "reference_match"]
+    assert esm_matches["source"].isin(["smip", "ssp2com"]).all()
 
 
 def test_select_archetypes_sci_fallback(tmp_path):

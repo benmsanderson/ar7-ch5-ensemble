@@ -19,8 +19,134 @@ open science decision flagged in
 
 from __future__ import annotations
 
+import json
+import operator
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
 import numpy as np
 import pandas as pd
+
+from .runners import repo_root
+
+# ---------------------------------------------------------------------------
+# Declarative GW scheme (schemes/gw/<name>.json)
+# ---------------------------------------------------------------------------
+
+# Directory holding the warming-classification schemes; one JSON per variant.
+GW_SCHEME_DIR = "schemes/gw"
+DEFAULT_GW_SCHEME = "si3"
+
+_OPS: dict[str, Any] = {
+    ">=": operator.ge,
+    "<=": operator.le,
+    ">": operator.gt,
+    "<": operator.lt,
+    "==": operator.eq,
+    "!=": operator.ne,
+}
+
+
+def _condition_ok(cond: dict, metrics: dict[str, Any]) -> bool:
+    """Evaluate a single ``{feature, op, threshold}`` condition.
+
+    A missing / NaN feature value yields ``False`` (a NaN never satisfies a
+    threshold), which reproduces the ``pd.notna(...) and ...`` guards of the
+    original hand-written cascade.
+    """
+    val = metrics.get(cond["feature"])
+    try:
+        return bool(_OPS[cond["op"]](val, cond["threshold"]))
+    except TypeError:
+        return False
+
+
+@dataclass(frozen=True)
+class GwScheme:
+    """A self-contained warming-classification scheme.
+
+    Parsed from ``schemes/gw/<name>.json``.  The scheme owns everything a
+    taxonomy needs: the ordered cascade of ``rules`` (each with optional
+    ``subcategories``), the ``category_order`` for plotting / tallying, and
+    the ``colors`` palette.  This lets alternative GW taxonomies be swapped
+    in during the writing process without touching code.
+    """
+
+    name: str
+    description: str
+    metrics: tuple[str, ...]
+    required: tuple[str, ...]
+    default_category: str
+    rules: tuple[dict, ...]
+    category_order: tuple[str, ...]
+    colors: dict[str, str]
+
+    @classmethod
+    def from_dict(cls, data: dict) -> GwScheme:
+        return cls(
+            name=str(data.get("name", "")),
+            description=str(data.get("description", "")),
+            metrics=tuple(data.get("metrics", ())),
+            required=tuple(data.get("required", ())),
+            default_category=str(data.get("default_category", "unclassified")),
+            rules=tuple(data.get("rules", ())),
+            category_order=tuple(data.get("category_order", ())),
+            colors=dict(data.get("colors", {})),
+        )
+
+    def classify(self, metrics: dict[str, Any]) -> tuple[str, str]:
+        """Classify one pathway's warming metrics into ``(category, subcategory)``.
+
+        ``metrics`` maps feature name → scalar (e.g. ``peak_warming_50``).
+        Returns ``(default_category, default_category)`` when a required
+        metric is missing / NaN or no rule matches.
+        """
+        for feat in self.required:
+            val = metrics.get(feat)
+            if val is None or (isinstance(val, float) and np.isnan(val)) or (
+                np.ndim(val) == 0 and pd.isna(val)
+            ):
+                return (self.default_category, self.default_category)
+
+        for rule in self.rules:
+            if all(_condition_ok(c, metrics) for c in rule.get("conditions", [])):
+                category = rule["category"]
+                subs = rule.get("subcategories")
+                if not subs:
+                    return (category, category)
+                for sub in subs:
+                    if all(_condition_ok(c, metrics) for c in sub.get("conditions", [])):
+                        return (category, sub["label"])
+                return (category, category)
+
+        return (self.default_category, self.default_category)
+
+
+def _resolve_gw_scheme_path(name_or_path: str | Path) -> Path:
+    """Resolve a scheme name (e.g. ``"si3"``) or explicit path to a JSON file."""
+    p = Path(name_or_path)
+    if p.suffix == ".json":
+        return p if p.is_absolute() else repo_root() / p
+    # Bare name → schemes/gw/<name>.json
+    return repo_root() / GW_SCHEME_DIR / f"{p.name}.json"
+
+
+def load_gw_scheme(name_or_path: str | Path = DEFAULT_GW_SCHEME) -> GwScheme:
+    """Load a warming-classification scheme by name or path.
+
+    ``name_or_path`` may be a bare scheme name resolved under
+    ``schemes/gw/`` (e.g. ``"si3"``) or an explicit ``.json`` path.
+    """
+    path = _resolve_gw_scheme_path(name_or_path)
+    if not path.is_file():
+        raise FileNotFoundError(f"GW scheme not found: {path}")
+    return GwScheme.from_dict(json.loads(path.read_text()))
+
+
+# Default scheme, loaded once. ``GW_ORDER`` / ``GW_COLORS`` derive from it so
+# existing imports keep working while remaining single-sourced in the JSON.
+_DEFAULT_GW_SCHEME = load_gw_scheme(DEFAULT_GW_SCHEME)
 
 # Temperature variable names in the SCI xlsx (Climate Assessment namespace).
 _GSAT = "Climate Assessment|Surface Temperature (GSAT)"
@@ -70,6 +196,7 @@ def classify_single(
     pw67: float,
     eocw67: float,
     declining: bool | None,
+    scheme: GwScheme | None = None,
 ) -> tuple[str, str]:
     """Classify a single scenario into GW main category and subcategory.
 
@@ -81,58 +208,28 @@ def classify_single(
         Same at the 67th percentile.
     declining
         Whether temperature is declining at end of century.
+    scheme
+        Warming scheme to apply (default: the canonical SI.3 scheme).
 
     Returns
     -------
     ``(main_category, subcategory)`` tuple, e.g. ``("GW2", "GW2a")``.
     """
-    if pd.isna(pw50):
-        return ("unclassified", "unclassified")
-
-    # GW0: PW50 < 1.5
-    if pw50 < 1.5:
-        return ("GW0", "GW0")
-
-    # GW1: PW50 < 1.6 (still GW1 even if EoCW not quite < 1.5)
-    if pw50 < 1.6:
-        return ("GW1", "GW1")
-
-    # GW2: PW50 < 1.7
-    if pw50 < 1.7:
-        if pd.notna(eocw50) and eocw50 < 1.5:
-            return ("GW2", "GW2a")
-        return ("GW2", "GW2b")
-
-    # GW3: PW67 < 2.0 ("likely below 2C")
-    if pd.notna(pw67) and pw67 < 2.0:
-        if pd.notna(eocw50) and eocw50 < 1.5:
-            return ("GW3", "GW3a")
-        return ("GW3", "GW3b")
-
-    # GW4: PW50 < 2.0
-    if pw50 < 2.0:
-        if pd.notna(eocw50) and eocw50 < 1.7:
-            return ("GW4", "GW4-I")
-        return ("GW4", "GW4-II")
-
-    # GW5: PW50 < 2.5
-    if pw50 < 2.5:
-        dec_label = "DEC" if declining else "Non-DEC"
-        return ("GW5", f"GW5-{dec_label}")
-
-    # GW6: PW50 < 3.0
-    if pw50 < 3.0:
-        return ("GW6", "GW6")
-
-    # GW7: PW50 < 3.5
-    if pw50 < 3.5:
-        return ("GW7", "GW7")
-
-    # GW8: PW50 >= 3.5
-    return ("GW8", "GW8")
+    scheme = scheme or _DEFAULT_GW_SCHEME
+    return scheme.classify(
+        {
+            "peak_warming_50": pw50,
+            "eoc_warming_50": eocw50,
+            "peak_warming_67": pw67,
+            "eoc_warming_67": eocw67,
+            "declining": declining,
+        }
+    )
 
 
-def classify_from_metrics(metrics: pd.DataFrame) -> pd.DataFrame:
+def classify_from_metrics(
+    metrics: pd.DataFrame, scheme: GwScheme | None = None
+) -> pd.DataFrame:
     """Apply :func:`classify_single` to a pre-computed warming-metrics frame.
 
     The frame is the output of
@@ -158,6 +255,7 @@ def classify_from_metrics(metrics: pd.DataFrame) -> pd.DataFrame:
             f"got {list(metrics.columns)}."
         )
     out = metrics.copy()
+    scheme = scheme or _DEFAULT_GW_SCHEME
     cats: list[str] = []
     subcats: list[str] = []
     for _, row in out.iterrows():
@@ -167,6 +265,7 @@ def classify_from_metrics(metrics: pd.DataFrame) -> pd.DataFrame:
             row["peak_warming_67"],
             row["eoc_warming_67"],
             row["declining"],
+            scheme=scheme,
         )
         cats.append(cat)
         subcats.append(sub)
@@ -175,7 +274,9 @@ def classify_from_metrics(metrics: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def classify_warming(df: pd.DataFrame) -> pd.DataFrame:
+def classify_warming(
+    df: pd.DataFrame, scheme: GwScheme | None = None
+) -> pd.DataFrame:
     """Classify all scenarios in a global ensemble into GW warming categories.
 
     Reads the MAGICC v7.5.3 percentile timeseries baked into the SCI xlsx and
@@ -192,6 +293,7 @@ def classify_warming(df: pd.DataFrame) -> pd.DataFrame:
     eoc_warming_50, eoc_warming_67, declining, category, subcategory``.
     """
     scenarios = df[["Model", "Scenario"]].drop_duplicates()
+    scheme = scheme or _DEFAULT_GW_SCHEME
     results = []
 
     for _, row in scenarios.iterrows():
@@ -207,7 +309,7 @@ def classify_warming(df: pd.DataFrame) -> pd.DataFrame:
         eocw67 = _eoc_warming(ts67)
         dec = _is_declining(ts50)
 
-        cat, subcat = classify_single(pw50, eocw50, pw67, eocw67, dec)
+        cat, subcat = classify_single(pw50, eocw50, pw67, eocw67, dec, scheme=scheme)
 
         results.append({
             "Model": model,
@@ -224,28 +326,11 @@ def classify_warming(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(results)
 
 
-# Colour palette for GW categories (consistent plotting).
-GW_COLORS = {
-    "GW0": "#1a237e",
-    "GW1": "#1565c0",
-    "GW2": "#2196f3",
-    "GW2a": "#64b5f6",
-    "GW2b": "#90caf9",
-    "GW3": "#26a69a",
-    "GW3a": "#4db6ac",
-    "GW3b": "#80cbc4",
-    "GW4": "#fdd835",
-    "GW5": "#ff9800",
-    "GW6": "#f4511e",
-    "GW7": "#c62828",
-    "GW8": "#4a148c",
-    "unclassified": "#9e9e9e",
-}
+# Colour palette and category order for GW categories, single-sourced from the
+# default GW scheme (``schemes/gw/si3.json``) so a new taxonomy is self-contained.
+GW_COLORS = dict(_DEFAULT_GW_SCHEME.colors)
 
-GW_ORDER = [
-    "GW0", "GW1", "GW2", "GW3", "GW4",
-    "GW5", "GW6", "GW7", "GW8", "unclassified",
-]
+GW_ORDER = list(_DEFAULT_GW_SCHEME.category_order)
 
 # Per-scenario colours for ScenarioMIP CMIP7 (temperature-ordered, cool to warm).
 # ssp2c sits between l (~1.9 K) and ml (~2.5 K) in end-of-century warming.
