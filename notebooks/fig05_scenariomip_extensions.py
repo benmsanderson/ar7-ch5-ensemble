@@ -1,9 +1,3 @@
-# ---
-# jupyter:
-#   jupytext:
-#     formats: notebooks///py:percent,notebooks///ipynb
-# ---
-
 # %% [markdown]
 # # Figure 05 - ScenarioMIP CMIP7 extensions (fig_extensions reproduction)
 #

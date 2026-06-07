@@ -1,0 +1,138 @@
+{
+    "name": "Two-axis (CC bin x drawdown band) partition + dominant-strategy label",
+    "description": "Two-axis emissions-based partition of the SCI ensemble, with a single dominant mitigation strategy named per pathway. Both axes are properties of the emissions trajectory only (no SCM lookup): cumulative net CO2 from 2020 to net-zero year on the primary axis, and post-NZ behaviour band on the secondary axis (pos/nz/over). Within each (CC, drawdown) cell, every pathway is given the single highest-priority strategy flag that fires (suffix_rules.mode='dominant'): CDR reliance, methane-led action, aerosol/SO2 cleanup, near-term deferral or fossil lock-in. Related flags are merged into families (deepcdr+land -> cdr; defer -> lockin) and rare archetypes (fewer than min_cluster_size pathways) fold into their cell's 'base' residual, keeping the list short and communicable. No clustering / random seed is used: the archetype count is tuned entirely from this JSON. The exploratory k-means analysis that originally chose these thresholds lives in the scenariocompass repository. CC bin edges are rounded to where MAGICC v7.5.3 medians cross GW-class PW50 boundaries in the SCI ensemble. AFOLU dependence, formerly a partition axis, was demoted to a strategy flag ('land') after diagnostic showed mean landdep/other centroid separation of 0.61 SD against a within-cell spread of 1.2 SD -- below typical noise.",
+    "ce_bins": {
+        "metric": "cum_co2_net_to_nz",
+        "thresholds": [
+            1000,
+            1500,
+            3000
+        ],
+        "labels": [
+            "CC1000",
+            "CC1500",
+            "CC3000",
+            "CC3000+"
+        ]
+    },
+    "drawdown_bands": {
+        "metric": "drawdown_band",
+        "comment": "Pre-computed in archetype_features (assign_drawdown_band).",
+        "thresholds": [
+            200
+        ],
+        "labels": [
+            "pos",
+            "nz",
+            "over"
+        ]
+    },
+    "cluster_features": [
+        "cum_co2_eip",
+        "cdr_fraction",
+        "ch4_reduction",
+        "so2_2050_rel",
+        "eip_2050_rel",
+        "eip_2100_rel"
+    ],
+    "suffix_rules": {
+        "mode": "dominant",
+        "merge": {
+            "deepcdr": "cdr",
+            "land": "cdr",
+            "defer": "lockin"
+        },
+        "residual_label": "base",
+        "display_order": [
+            "cdr",
+            "deepcdr",
+            "ch4",
+            "slcf",
+            "land",
+            "defer",
+            "lockin"
+        ],
+        "rules": {
+            "cdr": {
+                "conditions": [
+                    {
+                        "feature": "cdr_fraction",
+                        "op": ">=",
+                        "threshold": 0.25
+                    },
+                    {
+                        "feature": "cdr_fraction",
+                        "op": "<",
+                        "threshold": 0.55
+                    }
+                ]
+            },
+            "deepcdr": {
+                "conditions": [
+                    {
+                        "feature": "cdr_fraction",
+                        "op": ">=",
+                        "threshold": 0.55
+                    }
+                ]
+            },
+            "ch4": {
+                "conditions": [
+                    {
+                        "feature": "ch4_reduction",
+                        "op": "<=",
+                        "threshold": 0.50
+                    }
+                ]
+            },
+            "slcf": {
+                "conditions": [
+                    {
+                        "feature": "so2_2050_rel",
+                        "op": ">=",
+                        "threshold": 0.50
+                    }
+                ]
+            },
+            "land": {
+                "conditions": [
+                    {
+                        "feature": "cum_co2_afolu",
+                        "op": "<=",
+                        "threshold": -150
+                    }
+                ]
+            },
+            "defer": {
+                "conditions": [
+                    {
+                        "feature": "eip_2050_rel",
+                        "op": ">=",
+                        "threshold": 0.80
+                    },
+                    {
+                        "feature": "eip_2100_rel",
+                        "op": "<",
+                        "threshold": 0.30
+                    }
+                ]
+            },
+            "lockin": {
+                "conditions": [
+                    {
+                        "feature": "eip_2050_rel",
+                        "op": ">=",
+                        "threshold": 0.80
+                    },
+                    {
+                        "feature": "eip_2100_rel",
+                        "op": ">=",
+                        "threshold": 0.50
+                    }
+                ]
+            }
+        }
+    },
+    "min_cluster_size": 35,
+    "min_cluster_size_comment": "Occupancy floor: archetypes with fewer pathways fold into their cell's 'base' residual. Raise to shorten the list, lower (or set 0) to keep niche strategies. 35 yields ~16 archetypes on the current SCI ensemble."
+}

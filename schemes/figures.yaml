@@ -14,6 +14,8 @@ fig01_classification:
   # xlsx == MAGICC percentiles baked in the SCI xlsx (the regression path).
   # per_model / pooled use the 3-SCM ensemble metrics path (M5+).
   source: xlsx
+  # Warming taxonomy this figure is classified under (schemes/gw/<name>.json).
+  gw_scheme: si3
   # Plot both the full set and the vetted-only subset side-by-side.
   show_vetted_only: true
   output_formats: [png, pdf]
@@ -28,6 +30,7 @@ fig03_classification_per_scm:
   title: "GW0-GW8 classification per SCM across chapter input sets"
   experiment: classification
   source: per_model
+  gw_scheme: si3
   output_formats: [png, pdf]
 
 fig04_ssp2com_validation:
@@ -57,6 +60,19 @@ fig06_per_scm_grid:
   experiment: scenariomip_cmip7
   models: [fair, ciceroscm, magicc]
   pathways: [VL, L, LN, M, ML, H, HL, SSP2-com]
+  output_formats: [png, pdf]
+
+fig07_archetypes:
+  # Strategy × GW-class archetype grid: each cell carries the (Model, Scenario)
+  # selected as the representative pathway for that (emissions-strategy cluster,
+  # GW class) combination.  ESM picks (ScenarioMIP CMIP7) are highlighted.
+  # Reads outputs/archetypes.csv and outputs/clusters.csv produced by
+  # scripts/compute_archetypes.py.
+  title: "Emissions archetypes: representative pathways per (strategy, GW) cell"
+  experiment: archetypes
+  source: archetypes
+  gw_scheme: si3
+  gw_source: magicc
   output_formats: [png, pdf]
 
 fig05_scenariomip_extensions:
