@@ -1,0 +1,93 @@
+site_name: AR7 WG1 Chapter 5 Ensemble
+site_description: >-
+  Running FaIR 2.x, CICERO-SCM and MAGICC across the IPCC AR7 WG1 Chapter 5
+  scenario sets, with classification, emissions archetypes and figures.
+site_url: https://benmsanderson.github.io/ar7-ch5-ensemble/
+repo_url: https://github.com/benmsanderson/ar7-ch5-ensemble
+repo_name: benmsanderson/ar7-ch5-ensemble
+docs_dir: docs
+site_dir: site
+
+# Internal historical handover note kept in docs/ but excluded from the site
+# (it links into local .claude working files that are not part of the docs).
+exclude_docs: |
+  archetypes_port_brief.md
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - content.code.copy
+    - toc.follow
+    - search.suggest
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: numpy
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            members_order: source
+            separate_signature: true
+            merge_init_into_class: true
+            filters: ["!^_"]
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Installation: installation.md
+      - Running on NAC: running_on_nac.md
+      - Data setup: data_setup.md
+  - Pipeline:
+      - Running the SCMs: pipeline/running-scms.md
+      - Classification: pipeline/classification.md
+      - Emissions archetypes: pipeline/archetypes.md
+      - Building figures: pipeline/figures.md
+  - Methods: methods.md
+  - Engine / upstream switch: engine_upstream_switch.md
+  - Conventions: conventions.md
+  - API reference:
+      - Loaders: reference/load.md
+      - Harmonisation: reference/harmonise.md
+      - Vetting & feasibility: reference/vetting.md
+      - Classification: reference/classification.md
+      - Metrics: reference/metrics.md
+      - Archetype features: reference/archetype_features.md
+      - Clustering: reference/clustering.md
+      - Archetypes: reference/archetypes.md
+      - Cache & figures: reference/cache.md

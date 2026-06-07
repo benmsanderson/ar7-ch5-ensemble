@@ -14,6 +14,8 @@ platforms = ["linux-64", "osx-arm64"]
 test = "pytest"
 lint = "ruff check ."
 format = "ruff format ."
+docs = "mkdocs build --strict"
+docs-serve = "mkdocs serve"
 
 # Pin the BLAS / OpenMP thread pools to one thread each. This must be set before
 # numpy is imported, so it lives in the environment rather than in code. On NAC
@@ -72,6 +74,11 @@ jupytext = "*"
 # so aneris / silicone / pymagicc are NOT pulled by gcages); only the
 # gcages.ar6.post_processing functions are consumed.
 gcages = ">=0.14,<0.15"
+
+# Documentation site (MkDocs Material + mkdocstrings auto API reference).
+# Build with `pixi run docs`; live-preview with `pixi run docs-serve`.
+mkdocs-material = "*"
+mkdocstrings = { version = "*", extras = ["python"] }
 
 # MAGICC needs the path to the licensed binary. Do not hardcode it here (it is
 # machine-specific); set it in your shell or a gitignored .env.local, e.g.

@@ -167,6 +167,44 @@ For SCM driving, use the physical `Emissions|CO2|AFOLU`, not the
 `Emissions|CO2|AFOLU [NGHGI]` (national-inventory) variant, because the SCMs
 model the physical carbon cycle.
 
+## Emissions archetypes
+
+`scripts/compute_archetypes.py` reduces the SCI ensemble to a small, legible
+grid of representative pathways, one per (emissions strategy, warming class)
+cell. It is a deterministic port of the scenariocompass clustering notebooks,
+restructured so the archetype list is tuned entirely from JSON rather than from
+a random-seeded clustering run.
+
+**Features.** `ar7_ch5.archetype_features` computes, per pathway, six clustering
+features (cumulative EIP CO2 2020-2100, CDR fraction, CH4 reduction by 2050,
+SO2 in 2050, EIP CO2 in 2050 and 2100, all relative to 2020) plus three
+partition-axis fields (cumulative AFOLU CO2, cumulative net CO2 to the net-zero
+year, and a post-net-zero `drawdown_band` of `pos`/`nz`/`over`). CO2 integrals
+are trapezoidal and converted to Gt CO2 to match the CC-bin thresholds.
+ScenarioMIP carries no CCS variable, so its CDR fraction is zero by
+construction.
+
+**Strategy labelling.** `ar7_ch5.clustering.fit_clusters` assigns each pathway a
+composite `cluster_label` of `{ce_bin}-{drawdown}-{strategy}` (e.g.
+`CC1000-nz-cdr`). Every part is a pure threshold function of the features,
+declared in `schemes/clustered.json`: `ce_bins` bucket cumulative net CO2,
+`drawdown_band` is precomputed, and the dominant `strategy` suffix is the
+first firing rule in an ordered priority cascade (`suffix_rules.mode:
+dominant`). An occupancy floor (`min_cluster_size`) folds rare archetypes into
+their cell's `base` label so the final list stays around a dozen-and-a-half
+communicable archetypes. The k-means analysis that originally *chose* these
+thresholds is not rerun here; it lives in scenariocompass.
+
+**Representative selection.** `ar7_ch5.archetypes.select_archetypes` fills each
+(strategy, GW-class) cell with a single pathway. It prefers a reference
+pathway \u2014 SSP2-COM first, then ScenarioMIP CMIP7 \u2014 whose strategy cluster
+*and* GW class (from its own classification CSV) both match the cell; ties
+break by scenario name. If no reference qualifies, it takes the SCI pathway
+nearest the cell centroid in standardised feature space. The `source` and
+`selection_rule` columns record which branch was taken. `fig07_archetypes`
+colours reference picks with the GMD pathway palette and leaves SCI
+nearest-centroid picks white.
+
 ## The Chapter 5 contribution
 
 SCI ships MAGICC-only climate outcomes. The value added here is running the same

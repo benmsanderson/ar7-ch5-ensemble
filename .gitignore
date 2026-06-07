@@ -37,3 +37,6 @@ dist/
 
 # Jupytext generates .ipynb on demand; only the paired .py is tracked.
 notebooks/**/*.ipynb
+
+# MkDocs build output (built by `pixi run docs` / ReadTheDocs).
+site/

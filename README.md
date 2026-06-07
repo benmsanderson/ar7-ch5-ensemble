@@ -9,12 +9,13 @@ one canonical command-line entry point per task; notebooks are reserved for
 figures. The full plan, porting map, and conventions are in
 [ar7-ch5-ensemble-brief.md](ar7-ch5-ensemble-brief.md).
 
-> Status: M1-M7 complete (smoke runs, SCI ensemble batch on NAC, vetting /
+> Status: M1-M8 complete. Smoke runs, SCI ensemble batch on NAC, vetting /
 > feasibility / classification port, SSP2-COM ingestion + harmoniser,
-> ScenarioMIP CMIP7, RCMIP3 concentration-driven diagnostics). M8 figures
-> is in scaffold + first-figure form -- jupytext-paired figure scripts,
-> YAML-driven configuration, a read-only cache reporter, and `fig01`
-> wired end-to-end. See the milestone list in
+> ScenarioMIP CMIP7, RCMIP3 concentration-driven diagnostics, and the
+> emissions-archetypes port (feature extraction, JSON-tunable strategy
+> labelling, representative selection, fig07). Figures are jupytext-paired
+> scripts driven by YAML configuration with a read-only cache reporter. See
+> the milestone list in
 > [ar7-ch5-ensemble-brief.md](ar7-ch5-ensemble-brief.md) section 8.
 
 ## Scenario sets
@@ -50,7 +51,10 @@ pixi run python scripts/run_scenarios.py \
 # 6. Run vetting + feasibility + classification on the SCI ensemble (~5 min).
 pixi run python scripts/classify.py --source xlsx
 
-# 7. Build the figures registered in schemes/figures.yaml.
+# 7. Compute the emissions archetypes (features -> clusters -> representatives).
+pixi run python scripts/compute_archetypes.py
+
+# 8. Build the figures registered in schemes/figures.yaml.
 pixi run python scripts/make_figures.py --all
 ```
 
@@ -82,6 +86,35 @@ CMIP7 is harmonised by the CMIP7 pipeline; only SSP2-COM is harmonised here, by
 a light global harmoniser anchored to a published 2023 history. See
 [docs/methods.md](docs/methods.md) for details and the SCI-vintage caveat.
 
+## Emissions archetypes
+
+`scripts/compute_archetypes.py` reduces the full SCI ensemble (plus the
+ScenarioMIP CMIP7 and SSP2-COM reference pathways) to a small grid of
+representative pathways, one per (emissions strategy, warming class) cell. It
+is a deterministic, seed-free port of the scenariocompass clustering notebooks
+in three stages:
+
+1. **Feature extraction** ([archetype_features.py](src/ar7_ch5/archetype_features.py))
+   — six clustering features (cumulative EIP CO2, CDR fraction, CH4 reduction,
+   SO2 2050, EIP 2050/2100) plus three partition-axis fields (AFOLU CO2,
+   cumulative net CO2 to net-zero, post-net-zero drawdown band) per pathway.
+2. **Strategy labelling** ([clustering.py](src/ar7_ch5/clustering.py)) — each
+   pathway gets a composite `cluster_label` (`{ce_bin}-{drawdown}-{strategy}`,
+   e.g. `CC1000-nz-cdr`). The label is a pure function of the features and the
+   thresholds in [schemes/clustered.json](schemes/clustered.json); two knobs
+   keep the list short and communicable — `suffix_rules.mode: dominant` (one
+   strategy per pathway) and `min_cluster_size` (an occupancy floor that folds
+   rare labels into their cell's `base` archetype). No k-means / random seed is
+   involved at run time.
+3. **Representative selection** ([archetypes.py](src/ar7_ch5/archetypes.py)) —
+   for each (strategy, GW-class) cell, prefer a reference pathway (SSP2-COM,
+   then ScenarioMIP) whose strategy cluster and GW class both match; otherwise
+   take the SCI pathway nearest the cell centroid in standardised feature
+   space.
+
+The picks are written to `outputs/archetypes.csv` (with `outputs/clusters.csv`
+and `outputs/archetype_features.csv`) and plotted by `fig07_archetypes`.
+
 ## Building figures
 
 Three CLIs in a chain; each is read-only on the layer below it:
@@ -90,6 +123,7 @@ Three CLIs in a chain; each is read-only on the layer below it:
 scripts/cache_status.py    reports which ensemble outputs / CSVs are present
 scripts/run_scenarios.py   produces SCM ensemble NetCDFs (per experiment)
 scripts/classify.py        produces classification CSVs (per source)
+scripts/compute_archetypes.py  produces archetype features / clusters / picks
 scripts/make_figures.py    reads the cached outputs, writes PNG / PDF
 ```
 
@@ -112,6 +146,56 @@ Figures land under `outputs/figures/`. Adding a figure is two steps: a new
 `notebooks/figXX_*.py` and a new entry in `schemes/figures.yaml` keyed by
 the same id.
 
+## Documentation
+
+A MkDocs (Material) site under `docs/` collects the narrative guides
+(installation, NAC setup, data setup, the pipeline walkthroughs, methods) and
+an auto-generated API reference built from the package docstrings.
+
+### Read it online (no setup)
+
+The docs are published to GitHub Pages and rebuilt automatically on every push
+to `main`, so the hosted copy always tracks the code:
+
+**<https://benmsanderson.github.io/ar7-ch5-ensemble/>**
+
+This is the easiest option, especially when working on a cluster where
+forwarding a local port is awkward.
+
+### Read the docs locally (foolproof)
+
+If you prefer a local copy, you do **not** need MAGICC, the input data, or any
+of the climate models — `pixi` resolves everything the docs build needs.
+
+1. **Start the live docs server** from the repo root. On first run this builds
+   the pixi environment (a few minutes, only once), then serves the site:
+
+   ```bash
+   pixi run docs-serve
+   ```
+
+   If the environment is stale or you hit a missing-package error, force a
+   fresh install first with `pixi install`, then re-run the command above.
+
+2. **Open the docs**: visit <http://127.0.0.1:8000> in your browser. The page
+   rebuilds automatically when you edit anything under `docs/`. Press
+   `Ctrl+C` in the terminal to stop the server.
+
+That's it — no other setup is required to read the documentation.
+
+### Build a static copy
+
+```bash
+# One-off strict build into site/ (what ReadTheDocs runs).
+pixi run docs
+```
+
+This writes a self-contained HTML site to `site/`; open `site/index.html` in a
+browser. `mkdocs.yml` holds the nav and theme. The hosted copy is built and
+deployed by [.github/workflows/docs.yml](.github/workflows/docs.yml) on each
+push to `main`; `.readthedocs.yaml` is kept as an alternative hosting path
+(`pip install .[docs]`). The built `site/` directory is gitignored.
+
 ## Layout
 
 ```
@@ -124,6 +208,9 @@ src/ar7_ch5/          the package
   vetting.py          Riahi 2026 Table SI.1
   feasibility.py      Table SI.2 (feasibility + sustainability)
   classification.py   Table SI.3 (GW0-GW8) + emissions-based extension
+  archetype_features.py  per-pathway emissions features for archetypes
+  clustering.py       declarative strategy labelling (schemes/clustered.json)
+  archetypes.py       representative (strategy, GW) pathway selection
   metrics.py          warming metrics over the 3-SCM ensemble NetCDFs
   cache.py            read-only enumerator (expected vs present per experiment)
   figures.py          config / style / save helpers for figure scripts
@@ -131,11 +218,14 @@ src/ar7_ch5/          the package
 scripts/              canonical command-line entry points
   run_scenarios.py    select experiment + models, run the SCMs
   classify.py         vetting + feasibility + sustainability + classification
+  compute_archetypes.py  features -> clusters -> representative archetypes
   cache_status.py     report present / missing ensemble outputs
   make_figures.py     dispatch jupytext-paired figure scripts
 docs/                 data_setup.md, running_on_nac.md, methods.md
 schemes/              YAML configs
   figures.yaml        per-figure spec (experiment, source, output formats)
+  clustered.json      archetype partition + strategy-labelling thresholds
+  gw/<name>.json      GW0-GW8 warming taxonomy (default si3)
   style.yaml          shared palettes and DPI / font defaults
 notebooks/            jupytext-paired figure scripts (figXX_*.py tracked,
                       figXX_*.ipynb gitignored)

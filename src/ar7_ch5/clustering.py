@@ -185,24 +185,23 @@ def fit_clusters(
     Returns
     -------
     DataFrame with all input columns plus:
-      ``ce_bin``          CE-bin label (CC1000 / CC1500 / CC3000 / CC3000+)
-      ``cluster_label``   Full composite label, e.g. ``CC1000-nz-cdr``
-      ``centroid_*``      Group-mean feature values for the pathway's label
+
+    * ``ce_bin`` — CE-bin label (CC1000 / CC1500 / CC3000 / CC3000+)
+    * ``cluster_label`` — full composite label, e.g. ``CC1000-nz-cdr``
+    * ``centroid_*`` — group-mean feature values for the pathway's label
 
     The ``centroid_*`` columns give, for each pathway, the mean of every
     pathway sharing its ``cluster_label`` (computed over the combined
     SCI + ScenarioMIP set), providing a deterministic representative point.
 
     Two declarative knobs in ``scheme`` shape the resulting list so it stays
-    short and communicable, with no clustering step:
-
-    * ``suffix_rules.mode`` — ``"dominant"`` gives one strategy per pathway
-      (see :func:`match_suffix`).
-    * ``min_cluster_size`` — occupancy floor.  Any archetype with fewer than
-      this many pathways has its strategy folded into the cell residual
-      (``suffix_rules.residual_label``), so rare niche labels disappear into
-      the "base" archetype of their (CE-bin, drawdown) cell.  Set to ``0`` /
-      omit to keep every label.
+    short and communicable, with no clustering step.  ``suffix_rules.mode``
+    set to ``"dominant"`` gives one strategy per pathway (see
+    :func:`match_suffix`).  ``min_cluster_size`` is an occupancy floor: any
+    archetype with fewer than this many pathways has its strategy folded into
+    the cell residual (``suffix_rules.residual_label``), so rare niche labels
+    disappear into the "base" archetype of their (CE-bin, drawdown) cell.
+    Set to ``0`` / omit to keep every label.
     """
     ce_cfg = scheme["ce_bins"]
     cluster_features: list[str] = scheme["cluster_features"]

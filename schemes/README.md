@@ -2,10 +2,16 @@
 
 Configuration for the clustering / partition scheme.
 
-`clustered.json` (the three-axis partition plus within-cell clustering config)
-is to be copied verbatim from scenariocompass `schemes/clustered.json` when the
-clustering port lands (milestone 5+). It is kept as plain JSON config rather
-than buried in code.
+`clustered.json` is the declarative emissions-archetype scheme consumed by
+`ar7_ch5.clustering.fit_clusters`. It holds the partition thresholds
+(`ce_bins`, `drawdown_bands`), the ordered `suffix_rules` that assign each
+pathway its dominant strategy, and the two knobs that keep the archetype list
+short: `suffix_rules.mode` (`"dominant"` = one strategy per pathway) and
+`min_cluster_size` (occupancy floor folding rare labels into the cell `base`).
+The label is a pure, deterministic function of the per-pathway features — no
+k-means / random seed runs at this stage. The exploratory k-means analysis that
+originally *chose* these thresholds lives in the scenariocompass repository.
+Kept as plain JSON config rather than buried in code.
 
 ## `gw/` — warming-classification schemes
 

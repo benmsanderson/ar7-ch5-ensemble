@@ -65,7 +65,8 @@ fig06_per_scm_grid:
 fig07_archetypes:
   # Strategy × GW-class archetype grid: each cell carries the (Model, Scenario)
   # selected as the representative pathway for that (emissions-strategy cluster,
-  # GW class) combination.  ESM picks (ScenarioMIP CMIP7) are highlighted.
+  # GW class) combination.  Reference picks (ScenarioMIP CMIP7 / SSP2-COM) are
+  # coloured with the GMD pathway palette; SCI nearest-centroid picks are white.
   # Reads outputs/archetypes.csv and outputs/clusters.csv produced by
   # scripts/compute_archetypes.py.
   title: "Emissions archetypes: representative pathways per (strategy, GW) cell"

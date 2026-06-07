@@ -20,7 +20,7 @@ Partition-axis fields (not standardised):
   drawdown_band     'pos' / 'nz' / 'over'  (post-NZ drawdown categorical).
 
 Identity columns:
-  Model, Scenario, source  ('sci' or 'smip')
+  Model, Scenario, source  ('sci', 'smip' or 'ssp2com')
 
 SCI variable names (5-year grid, 2010-2100):
   'Climate Assessment|Harmonized|Emissions|CO2|Energy and Industrial Processes'

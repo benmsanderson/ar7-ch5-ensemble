@@ -23,6 +23,13 @@ dependencies = [
   "gcages>=0.14,<0.15",
 ]
 
+# Documentation build (used by ReadTheDocs and `pixi run docs`).
+[project.optional-dependencies]
+docs = [
+  "mkdocs-material",
+  "mkdocstrings[python]",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/ar7_ch5"]
 

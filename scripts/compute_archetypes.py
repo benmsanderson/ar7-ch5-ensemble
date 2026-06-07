@@ -13,8 +13,10 @@ Usage
     pixi run python scripts/compute_archetypes.py \\
         --sci-xlsx data/SCI/SCI-2025_v1.0_pathways_ensemble_global.xlsx \\
         --smip-csv data/scenariomip_cmip7/emissions_1750-2500.csv \\
+        --ssp2com-xlsx data/ssp2com/ssp2com_emissions.xlsx \\
         --classification-sci outputs/classification_per_model.csv \\
         --classification-smip outputs/classification_per_model_scenariomip.csv \\
+        --classification-ssp2com outputs/classification_per_model_ssp2com.csv \\
         --gw-source magicc \\
         --output-dir outputs
 """
