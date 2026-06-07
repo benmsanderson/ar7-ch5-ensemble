@@ -158,7 +158,7 @@ The docs are hosted on **ReadTheDocs** and rebuilt automatically on every push
 to `main`, so the public copy always tracks the code (the repository itself can
 stay private):
 
-**<https://ar7-ch5-ensemble.readthedocs.io/>**
+**<https://scm-ensemble.readthedocs.io/>**
 
 This is the easiest option, especially when working on a cluster where
 forwarding a local port is awkward.
