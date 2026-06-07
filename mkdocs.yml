@@ -2,7 +2,7 @@ site_name: AR7 WG1 Chapter 5 Ensemble
 site_description: >-
   Running FaIR 2.x, CICERO-SCM and MAGICC across the IPCC AR7 WG1 Chapter 5
   scenario sets, with classification, emissions archetypes and figures.
-site_url: https://benmsanderson.github.io/ar7-ch5-ensemble/
+site_url: https://ar7-ch5-ensemble.readthedocs.io/
 repo_url: https://github.com/benmsanderson/ar7-ch5-ensemble
 repo_name: benmsanderson/ar7-ch5-ensemble
 docs_dir: docs

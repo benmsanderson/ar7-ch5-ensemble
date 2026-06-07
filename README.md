@@ -154,10 +154,11 @@ an auto-generated API reference built from the package docstrings.
 
 ### Read it online (no setup)
 
-The docs are published to GitHub Pages and rebuilt automatically on every push
-to `main`, so the hosted copy always tracks the code:
+The docs are hosted on **ReadTheDocs** and rebuilt automatically on every push
+to `main`, so the public copy always tracks the code (the repository itself can
+stay private):
 
-**<https://benmsanderson.github.io/ar7-ch5-ensemble/>**
+**<https://ar7-ch5-ensemble.readthedocs.io/>**
 
 This is the easiest option, especially when working on a cluster where
 forwarding a local port is awkward.
@@ -192,8 +193,7 @@ pixi run docs
 
 This writes a self-contained HTML site to `site/`; open `site/index.html` in a
 browser. `mkdocs.yml` holds the nav and theme. The hosted copy is built and
-deployed by [.github/workflows/docs.yml](.github/workflows/docs.yml) on each
-push to `main`; `.readthedocs.yaml` is kept as an alternative hosting path
+deployed from [.readthedocs.yaml](.readthedocs.yaml) on each push to `main`
 (`pip install .[docs]`). The built `site/` directory is gitignored.
 
 ## Layout
