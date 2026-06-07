@@ -8,66 +8,178 @@
         "eoc_warming_67",
         "declining"
     ],
-    "required": ["peak_warming_50"],
+    "required": [
+        "peak_warming_50"
+    ],
     "default_category": "unclassified",
     "rules": [
         {
             "category": "GW0",
-            "conditions": [{"feature": "peak_warming_50", "op": "<", "threshold": 1.5}]
+            "conditions": [
+                {
+                    "feature": "peak_warming_50",
+                    "op": "<",
+                    "threshold": 1.5
+                }
+            ]
         },
         {
             "category": "GW1",
-            "conditions": [{"feature": "peak_warming_50", "op": "<", "threshold": 1.6}]
+            "conditions": [
+                {
+                    "feature": "peak_warming_50",
+                    "op": "<",
+                    "threshold": 1.6
+                }
+            ]
         },
         {
             "category": "GW2",
-            "conditions": [{"feature": "peak_warming_50", "op": "<", "threshold": 1.7}],
+            "conditions": [
+                {
+                    "feature": "peak_warming_50",
+                    "op": "<",
+                    "threshold": 1.7
+                }
+            ],
             "subcategories": [
-                {"label": "GW2a", "conditions": [{"feature": "eoc_warming_50", "op": "<", "threshold": 1.5}]},
-                {"label": "GW2b", "conditions": []}
+                {
+                    "label": "GW2a",
+                    "conditions": [
+                        {
+                            "feature": "eoc_warming_50",
+                            "op": "<",
+                            "threshold": 1.5
+                        }
+                    ]
+                },
+                {
+                    "label": "GW2b",
+                    "conditions": []
+                }
             ]
         },
         {
             "category": "GW3",
             "comment": "Likely below 2C: peak 67th percentile under 2.0.",
-            "conditions": [{"feature": "peak_warming_67", "op": "<", "threshold": 2.0}],
+            "conditions": [
+                {
+                    "feature": "peak_warming_67",
+                    "op": "<",
+                    "threshold": 2.0
+                }
+            ],
             "subcategories": [
-                {"label": "GW3a", "conditions": [{"feature": "eoc_warming_50", "op": "<", "threshold": 1.5}]},
-                {"label": "GW3b", "conditions": []}
+                {
+                    "label": "GW3a",
+                    "conditions": [
+                        {
+                            "feature": "eoc_warming_50",
+                            "op": "<",
+                            "threshold": 1.5
+                        }
+                    ]
+                },
+                {
+                    "label": "GW3b",
+                    "conditions": []
+                }
             ]
         },
         {
             "category": "GW4",
-            "conditions": [{"feature": "peak_warming_50", "op": "<", "threshold": 2.0}],
+            "conditions": [
+                {
+                    "feature": "peak_warming_50",
+                    "op": "<",
+                    "threshold": 2.0
+                }
+            ],
             "subcategories": [
-                {"label": "GW4-I", "conditions": [{"feature": "eoc_warming_50", "op": "<", "threshold": 1.7}]},
-                {"label": "GW4-II", "conditions": []}
+                {
+                    "label": "GW4-I",
+                    "conditions": [
+                        {
+                            "feature": "eoc_warming_50",
+                            "op": "<",
+                            "threshold": 1.7
+                        }
+                    ]
+                },
+                {
+                    "label": "GW4-II",
+                    "conditions": []
+                }
             ]
         },
         {
             "category": "GW5",
-            "conditions": [{"feature": "peak_warming_50", "op": "<", "threshold": 2.5}],
+            "conditions": [
+                {
+                    "feature": "peak_warming_50",
+                    "op": "<",
+                    "threshold": 2.5
+                }
+            ],
             "subcategories": [
-                {"label": "GW5-DEC", "conditions": [{"feature": "declining", "op": "==", "threshold": true}]},
-                {"label": "GW5-Non-DEC", "conditions": []}
+                {
+                    "label": "GW5-DEC",
+                    "conditions": [
+                        {
+                            "feature": "declining",
+                            "op": "==",
+                            "threshold": true
+                        }
+                    ]
+                },
+                {
+                    "label": "GW5-Non-DEC",
+                    "conditions": []
+                }
             ]
         },
         {
             "category": "GW6",
-            "conditions": [{"feature": "peak_warming_50", "op": "<", "threshold": 3.0}]
+            "conditions": [
+                {
+                    "feature": "peak_warming_50",
+                    "op": "<",
+                    "threshold": 3.0
+                }
+            ]
         },
         {
             "category": "GW7",
-            "conditions": [{"feature": "peak_warming_50", "op": "<", "threshold": 3.5}]
+            "conditions": [
+                {
+                    "feature": "peak_warming_50",
+                    "op": "<",
+                    "threshold": 3.5
+                }
+            ]
         },
         {
             "category": "GW8",
-            "conditions": [{"feature": "peak_warming_50", "op": ">=", "threshold": 3.5}]
+            "conditions": [
+                {
+                    "feature": "peak_warming_50",
+                    "op": ">=",
+                    "threshold": 3.5
+                }
+            ]
         }
     ],
     "category_order": [
-        "GW0", "GW1", "GW2", "GW3", "GW4",
-        "GW5", "GW6", "GW7", "GW8", "unclassified"
+        "GW0",
+        "GW1",
+        "GW2",
+        "GW3",
+        "GW4",
+        "GW5",
+        "GW6",
+        "GW7",
+        "GW8",
+        "unclassified"
     ],
     "colors": {
         "GW0": "#1a237e",
