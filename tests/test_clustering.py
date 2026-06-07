@@ -12,21 +12,24 @@ from ar7_ch5.clustering import (
     match_suffix,
 )
 
-
 # ---------------------------------------------------------------------------
 # assign_ce_bin
 # ---------------------------------------------------------------------------
 
 def test_assign_ce_bin_basic():
     vals = np.array([500, 1200, 2000, 5000])
-    labels = assign_ce_bin(vals, [1000, 1500, 3000], ["CC1000", "CC1500", "CC3000", "CC3000+"])
+    labels = assign_ce_bin(
+        vals, [1000, 1500, 3000], ["CC1000", "CC1500", "CC3000", "CC3000+"]
+    )
     assert list(labels) == ["CC1000", "CC1500", "CC3000", "CC3000+"]
 
 
 def test_assign_ce_bin_boundary():
     # Value exactly on threshold goes into the higher bin
     vals = np.array([1000.0])
-    labels = assign_ce_bin(vals, [1000, 1500, 3000], ["CC1000", "CC1500", "CC3000", "CC3000+"])
+    labels = assign_ce_bin(
+        vals, [1000, 1500, 3000], ["CC1000", "CC1500", "CC3000", "CC3000+"]
+    )
     assert labels[0] == "CC1500"
 
 
@@ -207,7 +210,7 @@ def test_fit_clusters_centroid_is_group_mean():
     smip = _make_features(4, "smip", ce=500.0)
     out = fit_clusters(sci, smip, _minimal_scheme())
 
-    for label, grp in out.groupby("cluster_label"):
+    for _label, grp in out.groupby("cluster_label"):
         for f in CLUSTER_FEATURES + ["cum_co2_afolu"]:
             expected = grp[f].mean()
             np.testing.assert_allclose(grp[f"centroid_{f}"].values, expected)

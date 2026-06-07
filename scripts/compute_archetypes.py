@@ -45,7 +45,9 @@ def _default_path(rel: str) -> Path:
 
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="Compute emissions archetype features, clusters and representatives.",
+        description=(
+            "Compute emissions archetype features, clusters and representatives."
+        ),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     p.add_argument(
@@ -64,25 +66,37 @@ def _parse_args() -> argparse.Namespace:
         "--ssp2com-xlsx",
         type=Path,
         default=None,
-        help="Path to SSP2-COM world-total xlsx (default: data/ssp2com/ssp2-com_world_total.xlsx).",
+        help=(
+            "Path to SSP2-COM world-total xlsx "
+            "(default: data/ssp2com/ssp2-com_world_total.xlsx)."
+        ),
     )
     p.add_argument(
         "--classification-sci",
         type=Path,
         default=None,
-        help="Per-model classification CSV for SCI (outputs/classification_per_model.csv).",
+        help=(
+            "Per-model classification CSV for SCI "
+            "(outputs/classification_per_model.csv)."
+        ),
     )
     p.add_argument(
         "--classification-smip",
         type=Path,
         default=None,
-        help="Per-model classification CSV for ScenarioMIP (outputs/classification_per_model_scenariomip.csv).",
+        help=(
+            "Per-model classification CSV for ScenarioMIP "
+            "(outputs/classification_per_model_scenariomip.csv)."
+        ),
     )
     p.add_argument(
         "--classification-ssp2com",
         type=Path,
         default=None,
-        help="Per-model classification CSV for SSP2-COM (outputs/classification_per_model_ssp2com.csv).",
+        help=(
+            "Per-model classification CSV for SSP2-COM "
+            "(outputs/classification_per_model_ssp2com.csv)."
+        ),
     )
     p.add_argument(
         "--gw-source",
@@ -132,12 +146,24 @@ def _resolve_paths(args: argparse.Namespace) -> dict[str, Path]:
             sys.exit(1)
         sci_xlsx = candidates[0]
 
-    smip_csv = args.smip_csv or root / "data" / "scenariomip_cmip7" / "emissions_1750-2500.csv"
-    clf_sci = args.classification_sci or root / "outputs" / "classification_per_model.csv"
-    clf_smip = args.classification_smip or root / "outputs" / "classification_per_model_scenariomip.csv"
+    smip_csv = (
+        args.smip_csv
+        or root / "data" / "scenariomip_cmip7" / "emissions_1750-2500.csv"
+    )
+    clf_sci = (
+        args.classification_sci
+        or root / "outputs" / "classification_per_model.csv"
+    )
+    clf_smip = (
+        args.classification_smip
+        or root / "outputs" / "classification_per_model_scenariomip.csv"
+    )
     scheme_path = args.scheme or root / "schemes" / "clustered.json"
     output_dir = args.output_dir or root / "outputs"
-    ssp2com_xlsx = args.ssp2com_xlsx or root / "data" / "ssp2com" / "ssp2-com_world_total.xlsx"
+    ssp2com_xlsx = (
+        args.ssp2com_xlsx
+        or root / "data" / "ssp2com" / "ssp2-com_world_total.xlsx"
+    )
     clf_ssp2com = (
         args.classification_ssp2com
         or root / "outputs" / "classification_per_model_ssp2com.csv"
@@ -213,7 +239,10 @@ def main() -> None:
     scheme = json.loads(paths["scheme"].read_text())
     print("Clustering ...", flush=True)
     clustered = fit_clusters(sci_features, reference_features, scheme)
-    print(f"  {clustered['cluster_label'].nunique()} strategy clusters found", flush=True)
+    print(
+        f"  {clustered['cluster_label'].nunique()} strategy clusters found",
+        flush=True,
+    )
 
     clusters_path = paths["output_dir"] / "clusters.csv"
     clustered.to_csv(clusters_path, index=False)

@@ -134,7 +134,9 @@ def select_archetypes(
     # Z-score normalisation parameters from the full SCI set, used for
     # centroid-distance calculations (numpy replacement for StandardScaler).
     sci_rows = merged[merged["source"] == "sci"].copy()
-    feature_matrix = sci_rows[CLUSTER_FEATURES].fillna(sci_rows[CLUSTER_FEATURES].median())
+    feature_matrix = sci_rows[CLUSTER_FEATURES].fillna(
+        sci_rows[CLUSTER_FEATURES].median()
+    )
     feat_mean = feature_matrix.mean().values.astype(float)
     feat_std = feature_matrix.std(ddof=0).values.astype(float)
     feat_std = np.where(feat_std == 0.0, 1.0, feat_std)
@@ -188,7 +190,9 @@ def select_archetypes(
             centroid_vec = sci_match[centroid_cols].iloc[0].values.astype(float)
             centroid_std = _standardise(centroid_vec)
 
-            feat_vals = sci_match[CLUSTER_FEATURES].fillna(sci_match[CLUSTER_FEATURES].median())
+            feat_vals = sci_match[CLUSTER_FEATURES].fillna(
+                sci_match[CLUSTER_FEATURES].median()
+            )
             X_candidates = _standardise(feat_vals.values)
             dists = np.linalg.norm(X_candidates - centroid_std, axis=1)
             best_row = sci_match.iloc[int(np.argmin(dists))]

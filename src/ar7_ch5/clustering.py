@@ -64,7 +64,7 @@ def assign_ce_bin(
     thresholds = sorted(thresholds)
     for i, val in enumerate(arr):
         assigned = False
-        for t, lbl in zip(thresholds, labels):
+        for t, lbl in zip(thresholds, labels, strict=False):
             if val < t:
                 out[i] = lbl
                 assigned = True

@@ -216,7 +216,9 @@ def _classify_non_sci(args) -> pd.DataFrame:
         source=args.source,
         input_source=args.input_source,
     )
-    warming = classify_from_metrics(metrics, scheme=getattr(args, "gw_scheme_obj", None)).reset_index()
+    warming = classify_from_metrics(
+        metrics, scheme=getattr(args, "gw_scheme_obj", None)
+    ).reset_index()
     warming = warming.rename(columns={"model": "Model", "scenario": "Scenario"})
     # ``Model`` carries the input_source name on this path (see
     # ``metrics.load_pathway_outputs``); the real chapter identity is
@@ -263,7 +265,9 @@ def _classify_from_metrics(df: pd.DataFrame, args) -> pd.DataFrame:
         source=args.source,
         input_source=args.input_source,
     )
-    warming = classify_from_metrics(metrics, scheme=getattr(args, "gw_scheme_obj", None)).reset_index()
+    warming = classify_from_metrics(
+        metrics, scheme=getattr(args, "gw_scheme_obj", None)
+    ).reset_index()
     # Metrics index uses (model, pathway_id, [climate_model]); the rest of
     # the M3 pipeline expects (Model, Scenario) IAMC casing.
     warming = warming.rename(columns={"model": "Model", "pathway_id": "Scenario"})

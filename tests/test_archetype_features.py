@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from ar7_ch5.archetype_features import (
     _compute_pathway_features,
@@ -13,7 +12,6 @@ from ar7_ch5.archetype_features import (
     compute_features_sci,
     compute_features_smip,
 )
-
 
 # ---------------------------------------------------------------------------
 # _find_netzero_year
@@ -94,10 +92,20 @@ def _make_pathway(
     ccs_arr = np.full_like(years, ccs) if ccs is not None else None
     # CH4: declines to ch4_reduction * 2020 value by 2050
     ch4_base = 400.0  # Mt CH4/yr
-    ch4 = np.interp(years, [2020.0, 2050.0, 2100.0], [ch4_base, ch4_base * ch4_reduction, ch4_base * ch4_reduction * 0.5])
+    ch4 = np.interp(
+        years,
+        [2020.0, 2050.0, 2100.0],
+        [
+            ch4_base,
+            ch4_base * ch4_reduction,
+            ch4_base * ch4_reduction * 0.5,
+        ],
+    )
     # Sulfur
     sulfur_base = 100.0
-    sulfur = np.interp(years, [2020.0, 2050.0], [sulfur_base, sulfur_base * sulfur_ratio])
+    sulfur = np.interp(
+        years, [2020.0, 2050.0], [sulfur_base, sulfur_base * sulfur_ratio]
+    )
     sulfur[years > 2050] = sulfur_base * sulfur_ratio
     return eip, afolu, ccs_arr, ch4, sulfur, years
 
@@ -153,10 +161,18 @@ def _make_sci_iamc(n_pathways: int = 3) -> pd.DataFrame:
     year_cols = list(range(2010, 2101, 5))
     rows = []
     for i in range(n_pathways):
-        base = {"Model": f"IAM{i}", "Scenario": f"SCN{i}", "Region": "World", "Unit": "Mt CO2/yr"}
+        base = {
+            "Model": f"IAM{i}",
+            "Scenario": f"SCN{i}",
+            "Region": "World",
+            "Unit": "Mt CO2/yr",
+        }
         for var, vals_fn in [
-            ("Climate Assessment|Harmonized|Emissions|CO2|Energy and Industrial Processes",
-             lambda y: max(0, 40000 - 300 * (y - 2020))),
+            (
+                "Climate Assessment|Harmonized|Emissions|CO2|"
+                "Energy and Industrial Processes",
+                lambda y: max(0, 40000 - 300 * (y - 2020)),
+            ),
             ("Climate Assessment|Harmonized|Emissions|CO2|AFOLU",
              lambda y: -1000.0),
             ("Carbon Capture|Geological Storage",

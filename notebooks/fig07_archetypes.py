@@ -20,12 +20,9 @@
 # %%
 from __future__ import annotations
 
-import sys
-
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
-from matplotlib.patches import FancyBboxPatch
+from matplotlib.patches import FancyBboxPatch, Patch
 
 from ar7_ch5 import figures
 from ar7_ch5.classification import GW_ORDER
@@ -215,8 +212,6 @@ ax.tick_params(axis="both", which="both", length=0)
 ax.spines[["top", "right", "bottom", "left"]].set_visible(False)
 
 # Legend: reference pathways present in the grid, coloured by the GMD palette.
-from matplotlib.patches import Patch
-
 present_refs = {
     (src, scen)
     for (_short, src, scen) in cell_map.values()

@@ -116,7 +116,10 @@ class GwScheme:
                 if not subs:
                     return (category, category)
                 for sub in subs:
-                    if all(_condition_ok(c, metrics) for c in sub.get("conditions", [])):
+                    if all(
+                        _condition_ok(c, metrics)
+                        for c in sub.get("conditions", [])
+                    ):
                         return (category, sub["label"])
                 return (category, category)
 

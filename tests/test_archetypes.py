@@ -2,16 +2,11 @@
 
 from __future__ import annotations
 
-import io
-import textwrap
-
 import numpy as np
 import pandas as pd
-import pytest
 
 from ar7_ch5.archetypes import select_archetypes
 from ar7_ch5.clustering import CLUSTER_FEATURES
-
 
 # ---------------------------------------------------------------------------
 # Synthetic fixtures
@@ -20,7 +15,9 @@ from ar7_ch5.clustering import CLUSTER_FEATURES
 def _make_clustered(n_sci: int = 20, n_smip: int = 3) -> pd.DataFrame:
     """Synthetic clustered DataFrame as output by fit_clusters."""
     rng = np.random.default_rng(77)
-    centroid_cols = {f"centroid_{f}": rng.uniform(0, 1, n_sci + n_smip) for f in CLUSTER_FEATURES}
+    centroid_cols = {
+        f"centroid_{f}": rng.uniform(0, 1, n_sci + n_smip) for f in CLUSTER_FEATURES
+    }
     centroid_cols["centroid_cum_co2_afolu"] = rng.uniform(-200, 0, n_sci + n_smip)
 
     half = n_sci // 2
@@ -29,7 +26,9 @@ def _make_clustered(n_sci: int = 20, n_smip: int = 3) -> pd.DataFrame:
             "Model": [f"IAM{i}" for i in range(n_sci)],
             "Scenario": [f"SCN{i}" for i in range(n_sci)],
             "source": "sci",
-            "cluster_label": (["CC1000-nz-cdr"] * half + ["CC1500-pos-base"] * (n_sci - half)),
+            "cluster_label": (
+                ["CC1000-nz-cdr"] * half + ["CC1500-pos-base"] * (n_sci - half)
+            ),
             **{f: rng.uniform(0, 1, n_sci) for f in CLUSTER_FEATURES},
             "cum_co2_afolu": rng.uniform(-200, 0, n_sci),
             "cum_co2_net_to_nz": rng.uniform(500, 2000, n_sci),
@@ -46,7 +45,9 @@ def _make_clustered(n_sci: int = 20, n_smip: int = 3) -> pd.DataFrame:
             "Model": ["scenariomip"] * n_smip,
             "Scenario": _smip_scenarios,
             "source": "smip",
-            "cluster_label": (["CC1000-nz-cdr", "CC1000-nz-cdr", "CC1500-pos-base"] * 4)[:n_smip],
+            "cluster_label": (
+                ["CC1000-nz-cdr", "CC1000-nz-cdr", "CC1500-pos-base"] * 4
+            )[:n_smip],
             **{f: rng.uniform(0, 1, n_smip) for f in CLUSTER_FEATURES},
             "cum_co2_afolu": rng.uniform(-200, 0, n_smip),
             "cum_co2_net_to_nz": rng.uniform(500, 2000, n_smip),
@@ -86,15 +87,22 @@ def test_select_archetypes_returns_dataframe(tmp_path):
     sci_rows = clustered[clustered["source"] == "sci"]
     smip_rows = clustered[clustered["source"] == "smip"]
 
-    ms_pairs = list(zip(sci_rows["Model"], sci_rows["Scenario"]))
-    smip_pairs = list(zip(smip_rows["Model"], smip_rows["Scenario"]))
+    ms_pairs = list(zip(sci_rows["Model"], sci_rows["Scenario"], strict=False))
+    smip_pairs = list(zip(smip_rows["Model"], smip_rows["Scenario"], strict=False))
     csv_content = _make_classification_csv(ms_pairs, smip_pairs)
     clf_path = tmp_path / "classification.csv"
     clf_path.write_text(csv_content)
 
     result = select_archetypes(clustered, clf_path, gw_source="magicc")
     assert isinstance(result, pd.DataFrame)
-    required_cols = {"strategy_label", "gw_class", "Model", "Scenario", "source", "selection_rule"}
+    required_cols = {
+        "strategy_label",
+        "gw_class",
+        "Model",
+        "Scenario",
+        "source",
+        "selection_rule",
+    }
     assert required_cols.issubset(set(result.columns))
 
 
@@ -104,8 +112,8 @@ def test_select_archetypes_esm_preferred(tmp_path):
     sci_rows = clustered[clustered["source"] == "sci"]
     smip_rows = clustered[clustered["source"] == "smip"]
 
-    ms_pairs = list(zip(sci_rows["Model"], sci_rows["Scenario"]))
-    smip_pairs = list(zip(smip_rows["Model"], smip_rows["Scenario"]))
+    ms_pairs = list(zip(sci_rows["Model"], sci_rows["Scenario"], strict=False))
+    smip_pairs = list(zip(smip_rows["Model"], smip_rows["Scenario"], strict=False))
     # Force all pathways to GW3 so ESM and SCI share the same GW class
     gw_map = {(m, s): "GW3" for m, s in ms_pairs + smip_pairs}
     csv_content = _make_classification_csv(ms_pairs, smip_pairs, gw_map)
@@ -125,8 +133,8 @@ def test_select_archetypes_sci_fallback(tmp_path):
     sci_rows = clustered[clustered["source"] == "sci"]
     smip_rows = clustered[clustered["source"] == "smip"]
 
-    ms_pairs = list(zip(sci_rows["Model"], sci_rows["Scenario"]))
-    smip_pairs = list(zip(smip_rows["Model"], smip_rows["Scenario"]))
+    ms_pairs = list(zip(sci_rows["Model"], sci_rows["Scenario"], strict=False))
+    smip_pairs = list(zip(smip_rows["Model"], smip_rows["Scenario"], strict=False))
     # ESM gets GW4; all SCI get GW3 in cluster CC1000-nz-cdr
     gw_map: dict[tuple[str, str], str] = {}
     for m, s in ms_pairs[:10]:  # first 10 are CC1000-nz-cdr

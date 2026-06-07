@@ -308,7 +308,9 @@ def compute_features_smip(df: pd.DataFrame) -> pd.DataFrame:
             if var in (_SMIP_EIP, _SMIP_AFOLU, _SMIP_CH4, _SMIP_SULFUR):
                 var_map[var] = row[raw_years].values.astype(float)
 
-        if not all(v in var_map for v in (_SMIP_EIP, _SMIP_AFOLU, _SMIP_CH4, _SMIP_SULFUR)):
+        if not all(
+            v in var_map for v in (_SMIP_EIP, _SMIP_AFOLU, _SMIP_CH4, _SMIP_SULFUR)
+        ):
             continue
 
         feat = _compute_pathway_features(
@@ -399,7 +401,9 @@ def load_and_compute_sci(
         if classification_csv is None:
             raise ValueError("vetted_only=True requires classification_csv.")
         vetted_df = pd.read_csv(Path(classification_csv))
-        passed = vetted_df.loc[vetted_df["vetting_status"] == "passed", ["Model", "Scenario"]]
+        passed = vetted_df.loc[
+            vetted_df["vetting_status"] == "passed", ["Model", "Scenario"]
+        ]
         passed = passed.rename(columns={"Model": "Model", "Scenario": "Scenario"})
         features = features.merge(
             passed.assign(_keep=True), on=["Model", "Scenario"], how="inner"
