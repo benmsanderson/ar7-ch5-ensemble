@@ -49,6 +49,8 @@ jupyterlab = "*"
 pytest = "*"
 ruff = "*"
 pip = "*"
+pandas-indexing = ">=0.6.3,<0.7"
+ipywidgets = ">=8.1.8,<9"
 
 # Climate models, scenario IO, and the SCM engine.
 # Engine is pinned to the upstream openscm-runner feature branch hosting
@@ -73,12 +75,15 @@ jupytext = "*"
 # successor to climate-assessment). We use the bare package (no [ar6] extra,
 # so aneris / silicone / pymagicc are NOT pulled by gcages); only the
 # gcages.ar6.post_processing functions are consumed.
-gcages = ">=0.14,<0.15"
+gcages = { git = "https://github.com/openscm/gcages", rev = "380854f127aa9850d91585bfd7698fd864b726e1" }
+
 
 # Documentation site (MkDocs Material + mkdocstrings auto API reference).
 # Build with `pixi run docs`; live-preview with `pixi run docs-serve`.
 mkdocs-material = "*"
 mkdocstrings = { version = "*", extras = ["python"] }
+aneris-iamc = ">=0.4.2, <0.5"
+silicone = ">=1.3.0, <2"
 
 # MAGICC needs the path to the licensed binary. Do not hardcode it here (it is
 # machine-specific); set it in your shell or a gitignored .env.local, e.g.
