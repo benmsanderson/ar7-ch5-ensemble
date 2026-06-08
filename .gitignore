@@ -1,3 +1,9 @@
+# Unclear if we can commit or not
+SCI-2025_v1.0_pathways_ensemble_global.xlsx
+# Outputs of sci-running demo
+emissions.feather
+sci_emissions_complete.parquet.gzip
+
 # Input and output data (see docs/data_setup.md for how to obtain inputs)
 data/
 outputs/
