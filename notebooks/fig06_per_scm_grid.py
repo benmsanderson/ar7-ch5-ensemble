@@ -1,9 +1,3 @@
-# ---
-# jupyter:
-#   jupytext:
-#     formats: notebooks///py:percent,notebooks///ipynb
-# ---
-
 # %% [markdown]
 # # Figure 06 - Per-SCM grid (CO2, CH4, ERF, GSAT)
 #
@@ -193,7 +187,7 @@ if missing:
 # ## Plot the 4 x 3 grid
 
 # %%
-PLOT_START = 1980
+PLOT_START = 1850
 PLOT_END = 2500
 
 fig, axes = plt.subplots(

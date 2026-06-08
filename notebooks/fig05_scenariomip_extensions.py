@@ -283,7 +283,7 @@ HIST_END = 2024     # last historical year drawn in black
 PLOT_END = 2500     # x-axis upper bound, matching the GMD CSV horizon
                     # (the chapter's emissions are extended to 2500 to
                     # exercise the long-tail extension period)
-PLOT_START = 1980   # x-axis lower bound; pre-1980 is uninteresting
+PLOT_START = 1850   # x-axis lower bound; pre-1980 is uninteresting
                     # historical and gets crowded.
 
 fig, axes = plt.subplots(nrows=4, ncols=2, figsize=(13, 14), sharex=True)

@@ -362,7 +362,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/5e/e3/00ec594aef5f55522e6d373bc2ac53e53a8f5e9ae32f2d6854b0de4270f3/mkdocstrings_python-2.0.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/d4/fa/285946c33bce716e082c11dfeee9ee196eaf1f5042efb3581a31f9f205e4/mypy-2.1.0-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/79/7b/2c79738432f5c924bef5071f933bcc9efd0473bac3b4aa584a6f7c1c8df8/mypy_extensions-1.1.0-py3-none-any.whl
-      - pypi: git+https://github.com/openscm/openscm-runner.git?branch=feat%2Ffair2-ciceroscmpy2-adapters-and-runmode-nonfork#c0e5af0b0f53d910023233ef8dad305ddb16d3c3
+      - pypi: git+https://github.com/openscm/openscm-runner.git?branch=feat%2Ffair2-ciceroscmpy2-adapters-and-runmode-nonfork#00e2ee4001aa97a229c64b65d8116b23f24a6e66
       - pypi: https://files.pythonhosted.org/packages/b2/9f/f48e406b4f92741f50350abeb054ed960bb2b1265bd4d21c3eb4906600c9/openscm_units-0.6.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/90/96/04b8e52da071d28f5e21a805b19cb9390aa17a47462ac87f5e2696b9566d/paginate-0.5.7-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b8/de/cfe7ef4af7badf889f95026634abd0b4c858dca61a6ecd9f7c281b55edb1/pandas_datapackage_reader-0.18.0-py2.py3-none-any.whl
@@ -691,7 +691,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/5e/e3/00ec594aef5f55522e6d373bc2ac53e53a8f5e9ae32f2d6854b0de4270f3/mkdocstrings_python-2.0.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/3b/08/9a585dea4325f20d8b80dc78623fa50d1fd2173b710f6237afd6ba6ab39b/mypy-2.1.0-cp311-cp311-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/79/7b/2c79738432f5c924bef5071f933bcc9efd0473bac3b4aa584a6f7c1c8df8/mypy_extensions-1.1.0-py3-none-any.whl
-      - pypi: git+https://github.com/openscm/openscm-runner.git?branch=feat%2Ffair2-ciceroscmpy2-adapters-and-runmode-nonfork#c0e5af0b0f53d910023233ef8dad305ddb16d3c3
+      - pypi: git+https://github.com/openscm/openscm-runner.git?branch=feat%2Ffair2-ciceroscmpy2-adapters-and-runmode-nonfork#00e2ee4001aa97a229c64b65d8116b23f24a6e66
       - pypi: https://files.pythonhosted.org/packages/b2/9f/f48e406b4f92741f50350abeb054ed960bb2b1265bd4d21c3eb4906600c9/openscm_units-0.6.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/90/96/04b8e52da071d28f5e21a805b19cb9390aa17a47462ac87f5e2696b9566d/paginate-0.5.7-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b8/de/cfe7ef4af7badf889f95026634abd0b4c858dca61a6ecd9f7c281b55edb1/pandas_datapackage_reader-0.18.0-py2.py3-none-any.whl
@@ -6189,7 +6189,7 @@ packages:
   - pkg:pypi/openpyxl?source=hash-mapping
   size: 492137
   timestamp: 1769122610043
-- pypi: git+https://github.com/openscm/openscm-runner.git?branch=feat%2Ffair2-ciceroscmpy2-adapters-and-runmode-nonfork#c0e5af0b0f53d910023233ef8dad305ddb16d3c3
+- pypi: git+https://github.com/openscm/openscm-runner.git?branch=feat%2Ffair2-ciceroscmpy2-adapters-and-runmode-nonfork#00e2ee4001aa97a229c64b65d8116b23f24a6e66
   name: openscm-runner
   version: 0.14.0a0
   requires_dist:
