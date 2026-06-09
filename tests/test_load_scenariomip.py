@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import pytest
 
-from ar7_ch5.load import CANONICAL_EMISSIONS
 from ar7_ch5.load_scenariomip import (
     SCENARIOS,
     load_scenariomip_emissions,
@@ -39,20 +38,20 @@ def test_seven_pathways(run):
 
 
 def test_canonical_emissions_only(run):
-    """All variables fall in the adapter-canonical set."""
+    """52 species after chapter harmonise + infill, in GCAGES naming."""
     variables = set(run.get_unique_meta("variable"))
-    assert variables.issubset(CANONICAL_EMISSIONS)
-    # ScenarioMIP carries 23 species after canonicalisation, the full set
-    # we drive.
-    assert len(variables) == 23
+    # 52 = COMPLETE_EMISSIONS_INPUT_VARIABLES_GCAGES from gcages.
+    assert len(variables) == 52
+    assert "Emissions|CO2|Fossil" in variables
+    assert "Emissions|CO2|Biosphere" in variables
 
 
-def test_annual_axis_clipped_to_2100(run):
-    """Half-year FaIR convention truncates to integer years and clips to 2100."""
+def test_annual_axis_2023_to_2100(run):
+    """Chapter cache is the 2023-2100 annual harmonised+infilled window."""
     years = sorted(set(run["year"]))
-    assert years[0] == 1750
+    assert years[0] == 2023
     assert years[-1] == 2100
-    assert years == list(range(1750, 2101))
+    assert years == list(range(2023, 2101))
 
 
 def test_subset_filter():

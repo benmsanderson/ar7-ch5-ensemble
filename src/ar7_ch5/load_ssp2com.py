@@ -6,7 +6,7 @@ canonical :class:`scmdata.ScmRun` whose variable names match the adapter
 convention. Pre-2023 is left to each SCM's bundle / historical splice
 (FaIR / CICERO run from 1750, MAGICC from 1765); harmonisation to a
 published 2023 history endpoint is the next stage (see
-:mod:`ar7_ch5.harmonise`).
+:mod:`ar7_ch5.harmonisation`).
 
 The xlsx is small (~17 KB, 23 x 28 cells) so we skip the CSV-cache dance
 :mod:`ar7_ch5.load` does for the much larger SCI file. Variable / unit /
@@ -23,10 +23,8 @@ import scmdata
 
 from ._rcmip3_naming import canonical_for
 from .load import (
-    CANONICAL_EMISSIONS,
-    _canonicalise_unit,
-    _canonicalise_variable,
-    _interpolate_annual,
+    _load_harmonised_cache,
+    _resolve_cache_path,
 )
 
 # Chapter pathway identifier (preserved on the ``pathway_id`` meta column).
@@ -40,29 +38,67 @@ _REQUIRED_COLUMNS = frozenset({"model", "scenario", "region", "variable", "unit"
 
 
 def load_ssp2com_world_total(
-    path: str | Path,
+    path: str | Path | None = None,
     *,
     region: str = "World",
-    sheet: str = "data",
-    to_annual: bool = True,
+    sheet: str = "data",  # legacy; ignored once cache is resolved
+    to_annual: bool = True,  # legacy; cache is already annual
 ) -> scmdata.ScmRun:
-    """Load SSP2-COM world-total emissions as a canonical ScmRun.
+    """Load chapter-harmonised+infilled SSP2-COM emissions as a canonical ScmRun.
+
+    Reads the parquet cache produced by ``scripts/harmonise.py --ensemble
+    ssp2com``. Variable names follow the **GCAGES** convention through
+    the body of the repository; the openscm-runner adapter rename is
+    applied at the runner boundary.
 
     Parameters
     ----------
     path
-        Path to ``ssp2-com_world_total.xlsx``.
+        Either the SSP2-COM xlsx (legacy entry point; sibling
+        ``cache/ssp2com_harmonised_infilled.parquet`` is read), or the
+        cache parquet directly. ``None`` resolves to the default cache
+        location under ``data/ssp2com/cache/``.
     region
         Region to keep. The world-total file is ``World`` only.
-    sheet
-        Worksheet to read (SSP2-COM convention: ``data``).
-    to_annual
-        If ``True`` (default), linearly interpolate the native 2023-2100
-        mixed-interval timeseries onto an annual grid, matching the SCI
-        loader so downstream consumers see one shape.
+    sheet, to_annual
+        Legacy parameters; ignored because the cache is parquet and is
+        already on the 2023-2100 annual grid.
     """
-    path = Path(path)
-    df = pd.read_excel(path, sheet_name=sheet)
+    del sheet, to_annual
+    cache_path = _resolve_cache_path(path, ensemble="ssp2com")
+    df = _load_harmonised_cache(cache_path, region=region)
+    if df.empty:
+        raise ValueError(
+            f"No SSP2-COM rows in {cache_path} (region={region!r})."
+        )
+    # Attach pathway_id (the chapter identifier) and rewrite scenario to the
+    # RCMIP3 canonical name the upstream runner splices against. See
+    # ar7_ch5._rcmip3_naming.canonical_for and docs/engine_upstream_switch.md.
+    df["pathway_id"] = df["scenario"]
+    df["scenario"] = df["scenario"].map(canonical_for)
+    return scmdata.ScmRun(df)
+
+
+def load_ssp2com_raw_iamc(
+    path: str | Path,
+    *,
+    region: str = "World",
+    sheet: str = "data",
+) -> pd.DataFrame:
+    """Return SSP2-COM world-total emissions in CMIP7_SCENARIOMIP IAMC form.
+
+    The published xlsx already uses the ``CMIP7_SCENARIOMIP`` variable
+    convention (``Emissions|HFC|HFC125``, ``Emissions|CO2|AFOLU``,
+    ``Emissions|Sulfur``) with Title-cased IAMC meta columns, so the
+    loader is a thin normaliser: lower-case the meta columns,
+    integerise the string year headers, and set the MultiIndex.
+
+    The chapter ``MESSAGE-BASED`` model is **not** listed in
+    ``aneris-overrides-global.csv`` (only seven IAMs are); the
+    harmoniser will apply Aneris default heuristics per species. This
+    is one of the open questions for the PR review.
+    """
+    df = pd.read_excel(Path(path), sheet_name=sheet)
     df.columns = [c.lower() if isinstance(c, str) else c for c in df.columns]
     missing = _REQUIRED_COLUMNS - set(df.columns)
     if missing:
@@ -71,23 +107,15 @@ def load_ssp2com_world_total(
         )
 
     df = df[df["region"] == region].copy()
-    df["variable"] = df["variable"].map(_canonicalise_variable)
-    df["unit"] = df["unit"].map(_canonicalise_unit)
-    df = df[df["variable"].isin(CANONICAL_EMISSIONS)]
-
     if df.empty:
-        raise ValueError(
-            f"No SSP2-COM rows survived canonicalisation of {path} "
-            f"(region={region!r})."
-        )
+        raise ValueError(f"No rows for region={region!r} in {path}.")
 
-    # Attach pathway_id (the chapter identifier) and rewrite scenario to the
-    # RCMIP3 canonical name the upstream runner splices against. See
-    # ar7_ch5._rcmip3_naming.canonical_for and docs/engine_upstream_switch.md.
-    df["pathway_id"] = df["scenario"]
-    df["scenario"] = df["scenario"].map(canonical_for)
-
-    run = scmdata.ScmRun(df)
-    if to_annual:
-        run = _interpolate_annual(run)
-    return run
+    df = df.set_index(list(_REQUIRED_COLUMNS))
+    new_cols = []
+    for c in df.columns:
+        try:
+            new_cols.append(int(c))
+        except (TypeError, ValueError):
+            new_cols.append(c)
+    df.columns = new_cols
+    return df

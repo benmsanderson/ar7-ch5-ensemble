@@ -133,3 +133,26 @@ IMAGE 3.4,World,Emissions|OC,reduce_ratio_2080
 IMAGE 3.4,World,Emissions|SF6,reduce_ratio_2080
 IMAGE 3.4,World,Emissions|Sulfur,reduce_ratio_2080
 IMAGE 3.4,World,Emissions|VOC,reduce_ratio_2080
+MESSAGE-BASED,World,Emissions|BC,reduce_ratio_2080
+MESSAGE-BASED,World,Emissions|C2F6,constant_ratio
+MESSAGE-BASED,World,Emissions|C6F14,constant_ratio
+MESSAGE-BASED,World,Emissions|CF4,reduce_ratio_2080
+MESSAGE-BASED,World,Emissions|CH4,reduce_ratio_2080
+MESSAGE-BASED,World,Emissions|CO,reduce_ratio_2080
+MESSAGE-BASED,World,Emissions|CO2|AFOLU,reduce_offset_2150_cov
+MESSAGE-BASED,World,Emissions|CO2|Energy and Industrial Processes,reduce_ratio_2080
+MESSAGE-BASED,World,Emissions|HFC|HFC125,constant_ratio
+MESSAGE-BASED,World,Emissions|HFC|HFC134a,reduce_ratio_2080
+MESSAGE-BASED,World,Emissions|HFC|HFC143a,reduce_ratio_2080
+MESSAGE-BASED,World,Emissions|HFC|HFC227ea,reduce_ratio_2080
+MESSAGE-BASED,World,Emissions|HFC|HFC23,constant_ratio
+MESSAGE-BASED,World,Emissions|HFC|HFC245fa,reduce_ratio_2080
+MESSAGE-BASED,World,Emissions|HFC|HFC32,constant_ratio
+MESSAGE-BASED,World,Emissions|HFC|HFC43-10,reduce_offset_2150_cov
+MESSAGE-BASED,World,Emissions|N2O,reduce_ratio_2080
+MESSAGE-BASED,World,Emissions|NH3,reduce_ratio_2080
+MESSAGE-BASED,World,Emissions|NOx,reduce_ratio_2080
+MESSAGE-BASED,World,Emissions|OC,reduce_ratio_2080
+MESSAGE-BASED,World,Emissions|SF6,reduce_ratio_2080
+MESSAGE-BASED,World,Emissions|Sulfur,reduce_ratio_2080
+MESSAGE-BASED,World,Emissions|VOC,reduce_ratio_2080

@@ -4,7 +4,7 @@ Reads the published emissions file from `scenariomip-paper-plots`
 (github.com/benmsanderson/scenariomip-paper-plots, Zenodo 20329427)
 covering the seven CMIP7 baseline scenarios (VL, L, LN, M, ML, H, HL).
 Maps the FaIR variable naming convention onto the adapter-canonical
-IAMC names (via :data:`ar7_ch5.load.FAIR_TO_CANONICAL`) and returns a
+CMIP7_SCENARIOMIP IAMC names (via :func:`flat_to_cmip7_iamc`) and returns a
 canonical :class:`scmdata.ScmRun`.
 
 The source uses FaIR's half-year offset convention for years (1750.5,
@@ -26,7 +26,10 @@ import pandas as pd
 import scmdata
 
 from ._rcmip3_naming import canonical_for
-from .load import CANONICAL_EMISSIONS, FAIR_TO_CANONICAL
+from .load import (
+    _load_harmonised_cache,
+    _resolve_cache_path,
+)
 
 # Chapter pathway identifiers (the short labels used throughout the
 # chapter / figures). These flow through to the ``pathway_id`` meta column
@@ -38,24 +41,143 @@ _REQUIRED_COLUMNS = frozenset({"model", "scenario", "region", "variable", "unit"
 
 
 def load_scenariomip_emissions(
-    path: str | Path,
+    path: str | Path | None = None,
     *,
     scenarios: Iterable[str] | None = None,
     region: str = "World",
-    end_year: int = 2100,
+    end_year: int = 2100,  # legacy; cache already clipped to 2100
 ) -> scmdata.ScmRun:
-    """Load ScenarioMIP CMIP7 baseline emissions as a canonical ScmRun.
+    """Load chapter-harmonised+infilled ScenarioMIP CMIP7 emissions as ScmRun.
+
+    Reads the parquet cache produced by ``scripts/harmonise.py --ensemble
+    scenariomip-cmip7``. Variable names follow the **GCAGES** convention
+    through the body of the repository; the openscm-runner adapter
+    rename is applied at the runner boundary.
 
     Parameters
     ----------
     path
-        Path to ``emissions_1750-2500.csv`` from scenariomip-paper-plots.
+        Either ``emissions_1750-2500.csv`` from scenariomip-paper-plots
+        (legacy entry point; sibling cache parquet is read) or the cache
+        parquet directly. ``None`` resolves to the default cache location.
     scenarios
         Subset of :data:`SCENARIOS` to keep. ``None`` keeps all seven.
     region
-        Region to keep. The published file is ``World`` only.
+        Region to keep.
     end_year
-        Upper bound on the year axis. Default 2100.
+        Legacy parameter; ignored because the cache already ends at 2100.
+    """
+    del end_year
+    cache_path = _resolve_cache_path(path, ensemble="scenariomip-cmip7")
+    df = _load_harmonised_cache(cache_path, region=region)
+    if scenarios is not None:
+        wanted = set(scenarios)
+        df = df[df["scenario"].isin(wanted)]
+        present = set(df["scenario"].unique())
+        if wanted - present:
+            raise ValueError(
+                f"Requested scenarios {sorted(wanted - present)} not present "
+                f"in {cache_path}; got {sorted(present)}."
+            )
+    if df.empty:
+        raise ValueError(
+            f"No ScenarioMIP CMIP7 rows in {cache_path} "
+            f"(scenarios={scenarios!r}, region={region!r})."
+        )
+
+    # Preserve the chapter pathway id on ``pathway_id`` and rewrite ``scenario``
+    # to the RCMIP3 canonical the runner splices against.
+    df["pathway_id"] = df["scenario"]
+    df["scenario"] = df["scenario"].map(canonical_for)
+    return scmdata.ScmRun(df)
+
+
+# The scenariomip-paper-plots emissions file
+# (``data/scenariomip_cmip7/emissions_1750-2500.csv``, Zenodo 20329427) ships
+# variable names in a flat, FaIR-style convention (``BC``, ``CO2 FFI``,
+# ``HFC-125``, ``CFC-11``, ``Halon-1211``, ``c-C4F8``, ``HFC-4310mee``). The
+# chapter harmonise+infill pipeline wants ``CMIP7_SCENARIOMIP`` IAMC names.
+# We resolve the conversion in two stages: a small normaliser to the
+# OPENSCM_RUNNER body, then defer to ``gcages.convert_variable_name`` for the
+# OPENSCM_RUNNER -> CMIP7_SCENARIOMIP translation. All 52 species present in
+# the file convert cleanly under this scheme; see tests/test_load_scenariomip.
+_FLAT_TO_OPENSCM_RUNNER_BODY_OVERRIDES: dict[str, str] = {
+    "CO2 FFI": "CO2|MAGICC Fossil and Industrial",
+    "CO2 AFOLU": "CO2|MAGICC AFOLU",
+    "HFC-43-10mee": "HFC4310mee",
+    "c-C4F8": "cC4F8",
+}
+_HYPHEN_STRIPPED_PREFIXES: tuple[str, ...] = (
+    "HFC-",
+    "CFC-",
+    "HCFC-",
+    "Halon-",
+)
+
+
+def _flat_to_openscm_runner_body(flat: str) -> str:
+    """Map a scenariomip-paper-plots flat name to the OPENSCM_RUNNER body."""
+    if flat in _FLAT_TO_OPENSCM_RUNNER_BODY_OVERRIDES:
+        return _FLAT_TO_OPENSCM_RUNNER_BODY_OVERRIDES[flat]
+    for prefix in _HYPHEN_STRIPPED_PREFIXES:
+        if flat.startswith(prefix):
+            return prefix.rstrip("-") + flat[len(prefix):]
+    return flat
+
+
+def flat_to_cmip7_iamc(flat: str) -> str:
+    """Convert a scenariomip-paper-plots flat name to ``CMIP7_SCENARIOMIP`` IAMC.
+
+    Public so the raw-load tests can pin every published species against the
+    gcages converter.
+    """
+    from gcages.renaming import SupportedNamingConventions, convert_variable_name
+
+    body = _flat_to_openscm_runner_body(flat)
+    return convert_variable_name(
+        f"Emissions|{body}",
+        from_convention=SupportedNamingConventions.OPENSCM_RUNNER,
+        to_convention=SupportedNamingConventions.CMIP7_SCENARIOMIP,
+    )
+
+
+# Species stripped from the ScenarioMIP CMIP7 raw input before
+# harmonisation; the infiller re-supplies them from the inversion history.
+# IAM submissions carry non-zero 2023 values that the chapter history files
+# as zero, which aneris cannot reconcile while landing exactly on history
+# (no anchor-respecting method exists for IAM > 0 vs history == 0).
+# Treating them as infillable matches their natural role in the
+# harmonise+infill split and avoids per-(model, variable) hist_zero
+# overrides for an inconsistent species set.
+# See docs/harmonisation_open_questions.md (Q1).
+_HALON_STRIP_VARIABLES_IAMC: frozenset[str] = frozenset({
+    "Emissions|Halon1202",
+    "Emissions|Halon2402",
+})
+
+
+def load_scenariomip_cmip7_raw_iamc(
+    path: str | Path,
+    *,
+    region: str = "World",
+    end_year: int = 2100,
+) -> pd.DataFrame:
+    """Return ScenarioMIP CMIP7 raw IAM emissions in CMIP7_SCENARIOMIP IAMC form.
+
+    Reads ``emissions_1750-2500.csv`` from scenariomip-paper-plots (Zenodo
+    20329427), converts the flat variable names to ``CMIP7_SCENARIOMIP``
+    IAMC, truncates the half-year time stamps to integer years and clips
+    to ``end_year``. Output shape matches what
+    :mod:`ar7_ch5.harmonisation` consumes: a MultiIndex of
+    ``(model, scenario, region, variable, unit)`` with integer year columns.
+
+    The ``scenario`` column carries the chapter pathway short code
+    (``VL``, ``L``, ..., ``HL``); the ``long_scenario`` IAMC label is
+    dropped here -- it's an audit-only field downstream of harmonisation.
+
+    ``Emissions|Halon1202`` / ``Emissions|Halon2402`` are stripped from the
+    output (see ``_HALON_STRIP_VARIABLES_IAMC``); the infiller re-supplies
+    them from the inversion history.
     """
     df = pd.read_csv(Path(path))
     df.columns = [c.lower() if isinstance(c, str) else c for c in df.columns]
@@ -65,28 +187,15 @@ def load_scenariomip_emissions(
             f"{path} is missing required IAMC columns: {sorted(missing)}."
         )
 
-    df = df[df["region"] == region]
-    if scenarios is not None:
-        wanted = set(scenarios)
-        df = df[df["scenario"].isin(wanted)]
-        present = set(df["scenario"].unique())
-        if wanted - present:
-            raise ValueError(
-                f"Requested scenarios {sorted(wanted - present)} not present "
-                f"in {path}; got {sorted(present)}."
-            )
-
-    df["variable"] = df["variable"].map(FAIR_TO_CANONICAL)
-    df = df[df["variable"].isin(CANONICAL_EMISSIONS)]
+    df = df[df["region"] == region].copy()
     if df.empty:
-        raise ValueError(
-            f"No ScenarioMIP rows survived canonicalisation of {path} "
-            f"(scenarios={scenarios!r}, region={region!r})."
-        )
+        raise ValueError(f"No rows for region={region!r} in {path}.")
 
-    # Half-year offset columns -> integer years; drop years beyond end_year.
-    year_cols = []
-    new_names = {}
+    df["variable"] = df["variable"].map(flat_to_cmip7_iamc)
+    df = df[~df["variable"].isin(_HALON_STRIP_VARIABLES_IAMC)]
+
+    year_cols: list = []
+    rename: dict = {}
     for c in df.columns:
         try:
             y = float(c)
@@ -95,20 +204,13 @@ def load_scenariomip_emissions(
         year_int = int(y)
         if year_int <= end_year:
             year_cols.append(c)
-            new_names[c] = year_int
-    long_cols = ["long_scenario"] if "long_scenario" in df.columns else []
-    keep_cols = list(_REQUIRED_COLUMNS) + long_cols + year_cols
-    keep_cols = [c for c in keep_cols if c in df.columns]
-    df = df[keep_cols].rename(columns=new_names)
+            rename[c] = year_int
 
-    # scmdata expects no duplicate column labels; the half-year convention can
-    # produce two .5 offsets falling into the same integer year (rare; drop
-    # duplicates by keeping the first).
+    drop_cols = ["long_scenario"] if "long_scenario" in df.columns else []
+    keep_cols = list(_REQUIRED_COLUMNS) + year_cols
+    df = df[keep_cols + [c for c in df.columns if c == "long_scenario"]].drop(
+        columns=drop_cols
+    )
+    df = df.rename(columns=rename)
     df = df.loc[:, ~df.columns.duplicated()]
-
-    # Preserve the chapter pathway id on ``pathway_id`` and rewrite ``scenario``
-    # to the RCMIP3 canonical the runner splices against.
-    df["pathway_id"] = df["scenario"]
-    df["scenario"] = df["scenario"].map(canonical_for)
-
-    return scmdata.ScmRun(df)
+    return df.set_index(list(_REQUIRED_COLUMNS))

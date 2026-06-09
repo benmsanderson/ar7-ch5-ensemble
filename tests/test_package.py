@@ -17,7 +17,8 @@ def test_version():
 def test_modules_importable():
     for name in [
         "ar7_ch5.load",
-        "ar7_ch5.harmonise",
+        "ar7_ch5.harmonisation",
+        "ar7_ch5.cmip7_inputs",
         "ar7_ch5.vetting",
         "ar7_ch5.classification",
         "ar7_ch5.runners.fair",

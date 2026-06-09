@@ -9,6 +9,16 @@ data/
 outputs/
 results/
 
+# CMIP7 ScenarioMIP harmonisation+infilling inputs are version-controlled
+# (chapter-owned choices: which history, which aneris overrides, which
+# GHG-inversion series). The ScenarioMIP infilling DB is large (~3 MB) and
+# fetched from Zenodo 20566343 -- see docs/data_setup.md.
+!data/cmip7/
+!data/cmip7/history_cmip7_scenariomip.csv
+!data/cmip7/aneris-overrides-global.csv
+!data/cmip7/cmip7_ghg_inversions.csv
+data/cmip7/infilling_db_*.csv
+
 # Licensed / large external binaries (e.g. MAGICC); reference by env var instead
 magicc/
 *.MAGICC
