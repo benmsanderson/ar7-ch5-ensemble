@@ -70,12 +70,13 @@ _SMIP_CH4 = "CH4"
 _SMIP_SULFUR = "Sulfur"
 
 # ---------------------------------------------------------------------------
-# SSP2-COM source variable names (canonical IAMC, see ar7_ch5.load_ssp2com)
+# SSP2-COM source variable names (GCAGES, post-PR #28; ar7_ch5.load_ssp2com
+# now returns chapter-harmonised+infilled emissions in the GCAGES convention).
 # ---------------------------------------------------------------------------
-_SSP2COM_EIP = "Emissions|CO2|MAGICC Fossil and Industrial"
-_SSP2COM_AFOLU = "Emissions|CO2|MAGICC AFOLU"
+_SSP2COM_EIP = "Emissions|CO2|Fossil"
+_SSP2COM_AFOLU = "Emissions|CO2|Biosphere"
 _SSP2COM_CH4 = "Emissions|CH4"
-_SSP2COM_SULFUR = "Emissions|Sulfur"
+_SSP2COM_SULFUR = "Emissions|SOx"
 
 # ---------------------------------------------------------------------------
 # Core helpers

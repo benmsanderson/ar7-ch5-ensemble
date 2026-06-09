@@ -45,7 +45,8 @@ def load_scenariomip_emissions(
     *,
     scenarios: Iterable[str] | None = None,
     region: str = "World",
-    end_year: int = 2100,  # legacy; cache already clipped to 2100
+    end_year: int = 2100,
+    extension_csv: str | Path | None = None,
 ) -> scmdata.ScmRun:
     """Load chapter-harmonised+infilled ScenarioMIP CMIP7 emissions as ScmRun.
 
@@ -54,20 +55,32 @@ def load_scenariomip_emissions(
     through the body of the repository; the openscm-runner adapter
     rename is applied at the runner boundary.
 
+    For ``end_year > 2100`` the chapter cache (the harmonise+infill
+    output, which ends at 2100) is spliced with the raw IAM emissions
+    from ``emissions_1750-2500.csv`` for 2101-``end_year``. The chapter
+    owns 2023-2100; the IAM passes through verbatim for the extension
+    period (matching the pre-PR-#28 behaviour). Species the IAM does not
+    report past 2100 hold flat at their 2100 chapter value.
+
     Parameters
     ----------
     path
         Either ``emissions_1750-2500.csv`` from scenariomip-paper-plots
-        (legacy entry point; sibling cache parquet is read) or the cache
-        parquet directly. ``None`` resolves to the default cache location.
+        (legacy entry point; sibling cache parquet is read), or the
+        cache parquet directly. ``None`` resolves to the default cache
+        location.
     scenarios
         Subset of :data:`SCENARIOS` to keep. ``None`` keeps all seven.
     region
         Region to keep.
     end_year
-        Legacy parameter; ignored because the cache already ends at 2100.
+        Upper bound on the year axis. ``2100`` (the cache horizon) is
+        the default; higher values trigger the IAM-extension splice.
+    extension_csv
+        Path to the raw ``emissions_1750-2500.csv`` used for the
+        2101-``end_year`` extension. ``None`` resolves to the default
+        SMIP CMIP7 source under ``data/scenariomip_cmip7/``.
     """
-    del end_year
     cache_path = _resolve_cache_path(path, ensemble="scenariomip-cmip7")
     df = _load_harmonised_cache(cache_path, region=region)
     if scenarios is not None:
@@ -85,11 +98,98 @@ def load_scenariomip_emissions(
             f"(scenarios={scenarios!r}, region={region!r})."
         )
 
+    if end_year > 2100:
+        df = _splice_iam_extension(
+            df,
+            scenarios=scenarios,
+            region=region,
+            end_year=end_year,
+            extension_csv=extension_csv,
+            cache_path_for_default=path,
+        )
+
     # Preserve the chapter pathway id on ``pathway_id`` and rewrite ``scenario``
     # to the RCMIP3 canonical the runner splices against.
     df["pathway_id"] = df["scenario"]
     df["scenario"] = df["scenario"].map(canonical_for)
     return scmdata.ScmRun(df)
+
+
+def _splice_iam_extension(
+    df: pd.DataFrame,
+    *,
+    scenarios: Iterable[str] | None,
+    region: str,
+    end_year: int,
+    extension_csv: str | Path | None,
+    cache_path_for_default: str | Path | None,
+) -> pd.DataFrame:
+    """Splice raw IAM emissions for 2101-``end_year`` onto the chapter cache.
+
+    The cache contributes (model, scenario, region, variable, unit) rows
+    with integer year columns 2023..2100. The IAM CSV contributes the
+    same species under its flat name convention; we map them to GCAGES
+    and concatenate the 2101..end_year columns. Species the IAM does not
+    publish (the chapter's 29 infilled species) hold their 2100 value
+    flat through the extension period.
+    """
+    ext_csv = _resolve_extension_csv(extension_csv, cache_path_for_default)
+    if not Path(ext_csv).is_file():
+        raise FileNotFoundError(
+            f"SMIP CMIP7 extension CSV not found: {ext_csv}. "
+            "Required for end_year > 2100 (the chapter cache stops at "
+            "2100; the IAM CSV provides 2101-2500)."
+        )
+
+    raw = load_scenariomip_cmip7_raw_iamc(ext_csv, region=region, end_year=end_year)
+    if scenarios is not None:
+        wanted = set(scenarios)
+        raw = raw[raw.index.get_level_values("scenario").isin(wanted)]
+
+    # Rename CMIP7_SCENARIOMIP -> GCAGES so the splice variable names
+    # match the cache. Defer to the chapter pipeline's helper.
+    from .harmonisation import rename_iamc_to_gcages
+
+    raw = rename_iamc_to_gcages(raw)
+    raw = raw.reset_index()
+
+    # Keep only the 2101..end_year cols + meta.
+    meta_cols = ["model", "scenario", "region", "variable", "unit"]
+    ext_years = [y for y in range(2101, end_year + 1) if y in raw.columns]
+    if not ext_years:
+        return df
+    raw = raw[meta_cols + ext_years]
+
+    # Concatenate cache (2023..2100) + IAM extension (2101..end_year) per
+    # (model, scenario, region, variable, unit). Rows present only in
+    # the cache (the infilled-only species) extend flat from 2100.
+    merged = df.merge(raw, on=meta_cols, how="left", suffixes=("", "_ext"))
+    for y in ext_years:
+        col_ext = y if y in raw.columns else f"{y}_ext"
+        merged[y] = merged.get(col_ext, merged.get(2100))
+        if col_ext in merged.columns and col_ext != y:
+            merged.drop(columns=[col_ext], inplace=True)
+    # Fill remaining post-2100 NaNs (infilled-only species) with the 2100 value.
+    for y in ext_years:
+        merged[y] = merged[y].fillna(merged[2100])
+    return merged
+
+
+def _resolve_extension_csv(
+    extension_csv: str | Path | None,
+    cache_path_for_default: str | Path | None,
+) -> Path:
+    """Find the raw IAM CSV; prefer an explicit override, then the default."""
+    if extension_csv is not None:
+        return Path(extension_csv)
+    if cache_path_for_default is not None:
+        candidate = Path(cache_path_for_default)
+        if candidate.suffix == ".csv":
+            return candidate
+    # Fall back to the canonical staged location.
+    from .runners import repo_root
+
+    return repo_root() / "data" / "scenariomip_cmip7" / "emissions_1750-2500.csv"
 
 
 # The scenariomip-paper-plots emissions file

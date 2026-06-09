@@ -202,7 +202,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     print(f"[harmonise] ensemble={args.ensemble} input={input_path}")
-    raw = _load_raw(args.ensemble, input_path)
+    raw = _load_raw(args.ensemble, input_path, end_year=args.annual_end_year)
 
     if args.limit is not None:
         raw = _slice_first_n_pathways(raw, args.limit)
@@ -257,11 +257,14 @@ def _default_output_for(ensemble: str) -> Path:
     return _DEFAULT_OUTPUTS[ensemble]
 
 
-def _load_raw(ensemble: str, path: Path) -> pd.DataFrame:
+def _load_raw(ensemble: str, path: Path, *, end_year: int) -> pd.DataFrame:
     if ensemble == "sci":
         return load_sci_raw_iamc(path)
     if ensemble == "scenariomip-cmip7":
-        return load_scenariomip_cmip7_raw_iamc(path)
+        # SMIP CMIP7 ships emissions to 2500; clip at the same end_year the
+        # pipeline interpolates onto so the raw input fully covers the
+        # harmonise+infill window.
+        return load_scenariomip_cmip7_raw_iamc(path, end_year=end_year)
     if ensemble == "ssp2com":
         return load_ssp2com_raw_iamc(path)
     raise ValueError(f"Unsupported ensemble: {ensemble}")
