@@ -1,8 +1,11 @@
 # Data setup
 
-All input data lives under `data/`, which is gitignored. Nothing here is
-committed to the repository; this document explains how to obtain each input.
-Paths below are relative to the repo root unless stated otherwise.
+Most input data lives under `data/`, which is gitignored except for the
+small CMIP7 harmonisation inputs (history, aneris overrides, GHG
+inversions); those are version-controlled because they encode chapter
+scientific choices. The infilling DB (~3 MB) is large enough to fetch
+on demand. This document explains how to obtain each input. Paths below
+are relative to the repo root unless stated otherwise.
 
 ## Layout
 
@@ -12,8 +15,22 @@ data/
   scenariomip_cmip7/   ScenarioMIP CMIP7 baseline emissions (from scenariomip-paper-plots)
   ssp2com/             SSP2-COM world-total xlsx (from scenariocompass)
   rcmip3_protocol/     RCMIP3 idealised experiment definitions
-  sci_csv/             preprocessed SCI CSVs (generated)
+  cmip7/               chapter harmonisation + infilling inputs (committed)
+  <ensemble>/cache/    parquet caches written by `scripts/harmonise.py` (gitignored)
 ```
+
+After dropping the published source files (sections 1-4 below) into
+place, build the per-ensemble harmonised+infilled parquet caches once:
+
+```bash
+pixi run python scripts/harmonise.py --ensemble sci
+pixi run python scripts/harmonise.py --ensemble scenariomip-cmip7
+pixi run python scripts/harmonise.py --ensemble ssp2com
+```
+
+The SCM-driving loaders read from those caches. See
+[`docs/harmonisation_open_questions.md`](harmonisation_open_questions.md)
+for the chapter scientific choices the pipeline encodes.
 
 ## 1. SCI 2025 ensemble (manual; access-restricted)
 
@@ -27,11 +44,12 @@ and place it at:
 
     data/SCI/SCI-2025_v1.0_pathways_ensemble_global.xlsx
 
-This file already contains harmonised and infilled, SCM-ready driving emissions
-under the `Climate Assessment|Infilled|Emissions|*` namespace (54 species),
-produced with the AR6 climate-assessment workflow and run through MAGICC
-v7.5.3. We use those directly rather than re-harmonising (see
-`docs/methods.md`).
+The chapter pipeline reads the **raw IAM** `Emissions|*` rows from this
+file (not the shipped `Climate Assessment|Infilled|*` namespace) and
+runs them through the chapter-owned harmonise+infill stages defined in
+[`docs/harmonisation_open_questions.md`](harmonisation_open_questions.md).
+The shipped namespace is retained as a *validation reference* used by
+`scripts/validate_sci_vs_shipped.py`.
 
 ## 2. SSP2-COM world-total (from scenariocompass)
 
@@ -154,14 +172,56 @@ On NAC it is staged at
 AR6 drawnset alongside in `magicc-dist/ar6_prob/`. Put the export in your shell
 profile or a gitignored `.env.local`.
 
-## 6. Everything else (Zenodo)
+## 6. CMIP7 harmonisation + infilling inputs (committed + Zenodo)
+
+The chapter harmonise+infill pipeline (`scripts/harmonise.py`) consumes
+four files lifted from the CMIP7 ScenarioMIP workflow. Three are small
+(~250 KB each) and version-controlled under `data/cmip7/`; the fourth
+(the infilling DB) is ~3 MB and fetched from Zenodo on demand.
+
+| File | Source | Path |
+| --- | --- | --- |
+| `history_cmip7_scenariomip.csv` | committed | `data/cmip7/` |
+| `aneris-overrides-global.csv` | committed | `data/cmip7/` |
+| `cmip7_ghg_inversions.csv` | committed | `data/cmip7/` |
+| `infilling_db_cmip7_scenariomip_20566343.csv` | [Zenodo 20566343](https://zenodo.org/records/20566343) | `data/cmip7/` |
+
+See [`docs/harmonisation_open_questions.md`](harmonisation_open_questions.md)
+for what each file encodes scientifically and the open questions for SOD.
+
+## 7. CICERO-SCM parameter posterior (chapter override for the FOD)
+
+The CICERO-SCM Zenodo calibration directory ships its own posterior
+(`calibrated_ciceroscm_ensemble.json`, the AR6 600-member set). For the
+AR7 first-order draft the chapter swaps in Marit Sandstad's AR7 v1
+500-member draws constrained by the assessed climate-sensitivity
+ranges. The override resolver is
+`ar7_ch5.runners.resolve_ciceroscm_distribution_json` and reads, in
+precedence order:
+
+1. `AR7_CICEROSCM_DISTRIBUTION_JSON` env var (per-run override).
+2. `data/calibration/ciceroscm_distribution.json` (the chapter-staged
+   default; typically a symlink).
+3. `None` -- the adapter discovers the posterior bundled with the
+   calibration directory (legacy AR6 behaviour, used when neither
+   override is set).
+
+On NAC, stage the FOD posterior as a symlink:
+
+```bash
+ln -sf /div/no-backup-nac/users/masan/GRAFITE/cscm-calibrate/draw_samples_archive/draw_samples_ar7_v1_500.json \
+       data/calibration/ciceroscm_distribution.json
+```
+
+Pass `--ciceroscm-distribution <path>` to `scripts/run_scenarios.py` to
+override per-run. The Zenodo calibration directory itself stays
+untouched, so the existing fetch workflow is unaffected.
+
+## 8. Everything else (Zenodo)
 
 The remaining inputs are fetched from their Zenodo archives:
 
 - FaIR 2.x calibration: Zenodo 18828694.
-- Global harmonisation history anchor (52 species, World, 1750-2023), used by
-  the light SSP2-COM harmoniser: Zenodo 17845154. On NAC this is already
-  present under
-  `emissions_harmonization_historical/data/processed/history-for-harmonisation/`.
+- CICERO-SCM calibration: Zenodo 20506399.
 
 A `scripts/` fetch helper for these will be added with the relevant milestone.

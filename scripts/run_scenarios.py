@@ -22,7 +22,6 @@ from ar7_ch5.experiments.rcmip3 import run_rcmip3
 from ar7_ch5.experiments.scenariomip_cmip7 import run_scenariomip
 from ar7_ch5.experiments.sci_ensemble import run_sci_batch
 from ar7_ch5.experiments.ssp2com import run_ssp2com
-from ar7_ch5.harmonise import DEFAULT_ANCHOR_YEAR, DEFAULT_CONVERGENCE_YEAR
 from ar7_ch5.load import available_sci_scenarios, load_sci_infilled
 from ar7_ch5.load_rcmip3 import DEFAULT_DIAGNOSTICS as RCMIP3_DIAGNOSTICS
 from ar7_ch5.load_scenariomip import SCENARIOS as SCENARIOMIP_SCENARIOS
@@ -42,12 +41,6 @@ DEFAULT_SCENARIOMIP_CSV = (
     repo_root() / "data" / "scenariomip_cmip7" / "emissions_1750-2500.csv"
 )
 DEFAULT_RCMIP3_BUNDLE = repo_root() / "data" / "rcmip3_protocol"
-# Where the global history anchor lives on NAC. Other machines should set
-# AR7_HARMONISATION_HISTORY or pass --history explicitly.
-DEFAULT_HARMONISATION_HISTORY = Path(
-    "/storage/no-backup-nac/users/bensan/emissions_harmonization_historical/"
-    "data/processed/history-for-harmonisation/zenodo_17845154/db"
-)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -76,31 +69,12 @@ def build_parser() -> argparse.ArgumentParser:
         "(data/scenariomip_cmip7/...), for 'rcmip3' the RCMIP3 protocol "
         "bundle directory (data/rcmip3_protocol/).",
     )
-    parser.add_argument(
-        "--history",
-        type=Path,
-        default=None,
-        help="Path to the global history anchor (sharded feather dir from "
-        "emissions-harmonisation-historical Zenodo 17845154). Only used by "
-        "--experiment ssp2com. Default: AR7_HARMONISATION_HISTORY env var, "
-        "else the NAC staged location.",
-    )
-    parser.add_argument(
-        "--anchor-year",
-        type=int,
-        default=DEFAULT_ANCHOR_YEAR,
-        help=(
-            "Harmonisation anchor year (ssp2com only). "
-            f"Default {DEFAULT_ANCHOR_YEAR}."
-        ),
-    )
-    parser.add_argument(
-        "--convergence-year",
-        type=int,
-        default=DEFAULT_CONVERGENCE_YEAR,
-        help=f"Harmonisation correction tapers to zero by this year (ssp2com only). "
-        f"Default {DEFAULT_CONVERGENCE_YEAR}.",
-    )
+    # NOTE: harmonisation is now run as a separate stage via
+    # ``scripts/harmonise.py`` (anchor/convergence/history live in
+    # ``ar7_ch5.harmonisation.HarmonisationConfig``). The SCM runs here
+    # read the already-harmonised+infilled parquet cache, so the old
+    # ``--history``, ``--anchor-year``, ``--convergence-year`` flags are
+    # gone.
     parser.add_argument(
         "--iam",
         default=None,
@@ -177,6 +151,17 @@ def build_parser() -> argparse.ArgumentParser:
         f"{DEFAULT_MAX_WORKERS}.",
     )
     parser.add_argument(
+        "--ciceroscm-distribution",
+        type=Path,
+        default=None,
+        help="Override the CICERO-SCM parameter posterior JSON for this run. "
+        "Sets AR7_CICEROSCM_DISTRIBUTION_JSON for the adapter. Default: "
+        "the chapter-staged file at data/calibration/"
+        "ciceroscm_distribution.json (the AR7 v1 500-member set for the "
+        "FOD), or the bundled AR6 posterior if neither is set. See "
+        "ar7_ch5.runners.resolve_ciceroscm_distribution_json.",
+    )
+    parser.add_argument(
         "--output",
         default="outputs",
         help="Directory for run output (gitignored).",
@@ -186,6 +171,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+
+    if args.ciceroscm_distribution is not None:
+        import os
+        os.environ["AR7_CICEROSCM_DISTRIBUTION_JSON"] = str(
+            args.ciceroscm_distribution.resolve()
+        )
 
     if args.experiment == "ssp2com":
         return _run_ssp2com(args)
@@ -301,15 +292,7 @@ def _run_scenariomip(args) -> int:
 
 def _run_ssp2com(args) -> int:
     """Run the SSP2-COM world-total pathway through the chosen models."""
-    import os
-
     xlsx = args.input or DEFAULT_SSP2COM_XLSX
-    history = args.history or Path(
-        os.environ.get(
-            "AR7_HARMONISATION_HISTORY", DEFAULT_HARMONISATION_HISTORY,
-        )
-    )
-
     out_dir = Path(args.output) / "ssp2com"
     n_members = 200 if args.n_members is None else args.n_members
     print(
@@ -318,13 +301,11 @@ def _run_ssp2com(args) -> int:
     )
 
     result = run_ssp2com(
-        xlsx, history,
+        xlsx,
         models=args.models,
         n_members=n_members,
         output_dir=out_dir,
         max_workers=args.max_workers,
-        anchor_year=args.anchor_year,
-        convergence_year=args.convergence_year,
     )
     _report_gsat(result)
     return 0

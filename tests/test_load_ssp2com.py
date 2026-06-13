@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import pytest
 
-from ar7_ch5.load import CANONICAL_EMISSIONS
 from ar7_ch5.load_ssp2com import (
     SSP2COM_CANONICAL_SCENARIO,
     SSP2COM_MODEL,
@@ -58,11 +57,13 @@ def test_annual_axis(ssp2com_run):
 
 
 def test_canonical_emissions(ssp2com_run):
-    """All 23 SSP2-COM species canonicalise into the adapter-known set."""
+    """52 species after chapter harmonise + infill, in GCAGES naming."""
     variables = set(ssp2com_run.get_unique_meta("variable"))
-    assert variables.issubset(CANONICAL_EMISSIONS)
-    # The xlsx ships 23 species, all in our canonical set.
-    assert len(variables) == 23
-    # CO2 sectors are the MAGICC-naming ones.
-    assert "Emissions|CO2|MAGICC Fossil and Industrial" in variables
-    assert "Emissions|CO2|MAGICC AFOLU" in variables
+    # 52 = COMPLETE_EMISSIONS_INPUT_VARIABLES_GCAGES from gcages, the chapter
+    # driving set; the body of the repo runs on this convention. The runner
+    # boundary translates to OPENSCM_RUNNER before SCM dispatch.
+    assert len(variables) == 52
+    assert "Emissions|CO2|Fossil" in variables
+    assert "Emissions|CO2|Biosphere" in variables
+    assert "Emissions|SOx" in variables
+    assert "Emissions|NMVOC" in variables

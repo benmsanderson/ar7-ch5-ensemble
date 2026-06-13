@@ -1,70 +1,105 @@
 # Methods
 
-Methodological reference for the Chapter 5 runs. This will be filled out as the
-ports land (it is the AR7 successor to scenariocompass `docs/APPROACHES.md`).
-The one decision worth stating up front is how emissions reach the climate
-models.
+Methodological reference for the Chapter 5 runs (the AR7 successor to
+scenariocompass `docs/APPROACHES.md`). The decision worth stating up front
+is how emissions reach the climate models.
 
-## Emissions to the climate models: no harmonisation stack in v1
+## Emissions to the climate models: chapter-owned harmonisation + infilling
 
-Three of the four input sets arrive already harmonised and infilled, so v1 does
-not take on a harmonisation/infilling pipeline (no aneris/silicone machinery):
+The chapter owns harmonisation + infilling end-to-end via a single
+`gcages.cmip7_scenariomip`-backed pipeline (the
+[`ar7_ch5.harmonisation`](reference/harmonise.md) module). One pipeline
+serves SCI, ScenarioMIP CMIP7 and SSP2-COM; per-ensemble specialisation
+lives in the raw loaders, not in the pipeline body.
 
-- **SCI 2025** ships harmonised + infilled driving emissions under
-  `Climate Assessment|Infilled|Emissions|*` (54 species), produced with the AR6
-  climate-assessment workflow (Kikstra et al.) and run through MAGICC v7.5.3.
-  We lift these directly.
-- **ScenarioMIP CMIP7** emissions are already harmonised + infilled by the
-  CMIP7 pipeline.
-- **SSP2-COM** is the one set that needs harmonising. It is handled by a
-  light-touch global (World-total) harmoniser: ratio convergence for
-  positive-definite species, offset convergence for zero-crossing species (net
-  CO2, CO2|AFOLU), with a single convergence-year knob, anchored to the CMIP7
-  world-total harmonised history (52 species, 1750-2023, Zenodo 17845154).
-  Missing halocarbons are borrowed from a baseline scenario rather than
-  silicone-infilled.
-- **RCMIP3** is concentration-driven, so no emissions harmonisation applies.
+The published per-ensemble sources are read as **raw IAM emissions**
+(`Emissions|*` IAMC rows), not as already-harmonised products:
 
-### Validation against Charlie Koven's `ar7_wg1_ch5` reference
+- **SCI 2025** — raw IAM rows from the published xlsx. (The shipped
+  `Climate Assessment|Infilled|Emissions|*` namespace is retained as a
+  *validation reference* used by `scripts/validate_sci_vs_shipped.py`,
+  not as production input.)
+- **ScenarioMIP CMIP7** — raw IAM rows from `scenariomip-paper-plots`
+  (Zenodo 20329427). A flat-FaIR-name → `CMIP7_SCENARIOMIP` IAMC rename
+  is applied at the raw-loader boundary
+  (`ar7_ch5.load_scenariomip.flat_to_cmip7_iamc`); `Halon1202` /
+  `Halon2402` are stripped before harmonisation and re-supplied by the
+  infiller (chapter decision; see open questions).
+- **SSP2-COM** — the world-total xlsx already ships in
+  `CMIP7_SCENARIOMIP` IAMC convention, so the raw loader is a thin
+  normaliser.
+- **RCMIP3** — concentration-driven, so the harmonisation pipeline does
+  not apply.
 
-The SSP2-COM harmoniser is compared against Charlie Koven's FaIR-only
-SSP2-COM pipeline using `scripts/validate_ssp2com_vs_charlie.py`. The
-script loads both pipelines' SSP2-COM emissions and writes a per-
-(species, year) comparison CSV to `outputs/ssp2com/validation_vs_charlie.csv`.
+The pipeline writes a parquet cache per ensemble at
+`data/<ensemble>/cache/<ensemble>_harmonised_infilled.parquet`; the SCM
+loaders read those caches. Build them with:
 
-Two systematic differences come out, and both are method choices rather
-than bugs:
+```bash
+pixi run python scripts/harmonise.py --ensemble {sci,scenariomip-cmip7,ssp2com}
+```
 
-1. **Input gap.** Charlie's SSP2-COM CSV (`data/fair-inputs/emissions_1750-
-   2500_with_ssp2com.csv`) carries the main GHGs and ozone precursors but
-   not all of the halocarbons; his pipeline fills the missing species with
-   the L scenario as a default. The scenariocompass world-total xlsx we
-   use does carry the full 23-species SSP2-COM set, so for 8 HFCs
-   (HFC-125, HFC-134a, HFC-143a, HFC-227ea, HFC-23, HFC-245fa, HFC-32,
-   HFC-4310mee) the two pipelines are not even running on the same
-   underlying scenario data. The validation script flags these
-   explicitly under `charlie_used_l_fallback=True` and excludes them
-   from the harmonisation-comparison summary.
+### Pipeline stages
 
-2. **Anchor choice.** For the 15 species both pipelines source from
-   SSP2-COM (BC, CH4, CO, CO2 AFOLU, CO2 FFI, N2O, NH3, NOx, OC, SF6,
-   Sulfur, VOC, C2F6, C6F14, CF4), the main GHGs agree at 5-15% across
-   2025-2100. The PFCs (C2F6, CF4, C6F14) show large 2025 anomalies (up
-   to ~220% for C2F6) because the published 2023 global history endpoint
-   has very different values than the IAM's 2023 estimate (factor of ~4
-   for C2F6); the linear taper on a large correction creates a transient
-   bump that resolves by 2050. This is intrinsic to the ratio-with-
-   convergence method when scenario and history disagree on baseline
-   magnitude. For chapter-relevant aggregates (warming, exceedance
-   probabilities) the transient is small; for species-level PFC plots
-   the choice should be flagged.
+The top-level entry point is `ar7_ch5.harmonisation.harmonise_and_infill`.
+Each stage is also exposed as a public helper for unit testing and
+walkthroughs (`notebooks/harmonisation_demo.py`):
 
-The takeaway: the brief's "light global harmoniser anchored to 2023
-history" produces a defensible SSP2-COM input that agrees with Charlie's
-on the macroscale and differs in well-understood ways at the species
-level. The two differences above are not in scope to harmonise away;
-they are intentional consequences of (a) richer SSP2-COM source data
-and (b) a different anchoring choice.
+1. **Annual interpolation.** Sparse-to-annual linear interpolation onto
+   a 2023-2100 integer-year grid.
+2. **Variable rename to GCAGES.** Maps `CMIP7_SCENARIOMIP` IAMC names
+   onto the chapter's GCAGES convention via
+   `gcages.renaming.rename_variables`; drops the aggregate parents
+   (`Emissions|CO2`, `Emissions|F-Gases`, ...) to avoid duplicates.
+3. **History splice.** For each row whose first non-null year `y0 >
+   2023`, fills `[2023, y0 - blend_years]` with the chapter history
+   year-by-year and linearly blends `(y0 - blend_years, y0)` from the
+   history value to the scenario's first value (default `blend_years
+   = 5`). Rows whose variable is absent from history are dropped to a
+   sidecar CSV.
+4. **HFC zero-rounding + non-CO2 negative drop.** Per-cell HFC
+   zero-rounding kills numerical noise without destroying decaying
+   trajectories; any `(model, scenario)` with a stray negative on a
+   non-CO2 species is dropped (recorded in the sidecar).
+5. **Aneris harmonisation.** Anchored at 2023 against
+   `data/cmip7/history_cmip7_scenariomip.csv` with per-IAM method
+   overrides from `data/cmip7/aneris-overrides-global.csv`. Methods
+   come from gcages's `create_cmip7_scenariomip_global_harmoniser`.
+6. **Infilling.** `RMSClosest` against
+   `data/cmip7/infilling_db_cmip7_scenariomip_20566343.csv`, padding
+   minor GHGs from `data/cmip7/cmip7_ghg_inversions.csv`. Output is
+   the full 52-species `COMPLETE_EMISSIONS_INPUT_VARIABLES_GCAGES`
+   driving set.
+
+Variable naming is GCAGES through the body of the chapter; the
+openscm-runner adapter rename (GCAGES → OPENSCM_RUNNER) is applied at
+the runner boundary by
+`ar7_ch5.runners.orchestrate.rename_to_openscm_runner` so the SCMs see
+their canonical input names.
+
+### Scientific choices and open questions
+
+The pipeline encodes a number of chapter-owned scientific choices (which
+history vintage, which aneris overrides, which infilling DB, infiller
+method, Halon treatment, ...). Each is tracked with a status flag
+(`DECIDED` / `CONFIGURED-DEFAULT` / `OPEN`) and the reasoning behind it
+in
+[`docs/harmonisation_open_questions.md`](harmonisation_open_questions.md).
+Update that file whenever a choice changes; refresh the golden fixture
+parquets in the same commit (so the regression diagnostic catches
+unintended drift in the same review).
+
+### Validation diagnostic
+
+`scripts/validate_sci_vs_shipped.py` is a per-species delta report
+between the chapter pipeline's SCI output and SCI's shipped
+`Climate Assessment|Infilled|Emissions|*` namespace, on the
+`(model, scenario, variable)` intersection. It is a *diagnostic*, not
+an assertion: the two outputs embed different scientific choices
+(chapter history vs SCI's AR6 climate-assessment workflow), so the
+question is "how big are the deltas, and is the pattern intelligible?".
+The script writes a per-species summary CSV and prints the top-10
+species by mean absolute delta at 2100.
 
 ### RCMIP3 canonical-scenario splice and the chapter mapping
 
@@ -152,14 +187,15 @@ RCMIP3 name -- the bundle row that supplied the splice) and
 bundle row supplied the splice for this output?" is answerable from
 any artefact alone.
 
-### Vintage note (flag before cross-ensemble comparison)
+### Vintage note (no longer applies)
 
-SCI is harmonised to the AR6 historical vintage (~2015 base, RCMIP), while the
-ScenarioMIP CMIP7 set is harmonised to 2023 CMIP7 history. The two ensembles
-therefore sit on different historical baselines. Treating each on its own terms
-is fine; making them directly comparable on one baseline would mean
-re-harmonising SCI to the 2023 anchor with the same global harmoniser. That is
-a deliberate, deferred scientific choice, not a v1 default.
+Previously, SCI inputs were lifted from SCI's shipped `Climate
+Assessment|Infilled|*` namespace, which is harmonised to the AR6 vintage
+(~2015 base, RCMIP), while ScenarioMIP CMIP7 was harmonised to 2023
+CMIP7 history. Under the chapter-owned pipeline above, all three
+ensembles are now harmonised against the same 2023 anchor
+(`data/cmip7/history_cmip7_scenariomip.csv`), so cross-ensemble
+comparison is on a single historical baseline by construction.
 
 ## AFOLU CO2 convention
 

@@ -38,23 +38,29 @@ pixi install
 #    and, for MAGICC, export the binary path:
 #    export MAGICC_EXECUTABLE_7=/path/to/magicc7/bin/magicc
 
-# 3. See the run interface.
+# 3. Build the per-ensemble harmonised+infilled caches once (chapter-owned
+#    harmonisation; see "How emissions reach the models" below).
+pixi run python scripts/harmonise.py --ensemble ssp2com
+pixi run python scripts/harmonise.py --ensemble sci
+pixi run python scripts/harmonise.py --ensemble scenariomip-cmip7
+
+# 4. See the run interface.
 pixi run python scripts/run_scenarios.py --help
 
-# 4. Run the tests.
+# 5. Run the tests.
 pixi run test
 
-# 5. Run one experiment end-to-end (FaIR-only smoke, ~10 s).
+# 6. Run one experiment end-to-end (FaIR-only smoke, ~10 s).
 pixi run python scripts/run_scenarios.py \
     --experiment ssp2com --models fair --n-members 5
 
-# 6. Run vetting + feasibility + classification on the SCI ensemble (~5 min).
+# 7. Run vetting + feasibility + classification on the SCI ensemble (~5 min).
 pixi run python scripts/classify.py --source xlsx
 
-# 7. Compute the emissions archetypes (features -> clusters -> representatives).
+# 8. Compute the emissions archetypes (features -> clusters -> representatives).
 pixi run python scripts/compute_archetypes.py
 
-# 8. Build the figures registered in schemes/figures.yaml.
+# 9. Build the figures registered in schemes/figures.yaml.
 pixi run python scripts/make_figures.py --all
 ```
 
@@ -79,12 +85,35 @@ scenariomip-paper-plots (Zenodo 20329427); see
 
 ## How emissions reach the models
 
-Three of the four input sets arrive already harmonised and infilled, so this
-repository does not carry a harmonisation/infilling stack. SCI ships SCM-ready
-driving emissions (`Climate Assessment|Infilled|Emissions|*`); ScenarioMIP
-CMIP7 is harmonised by the CMIP7 pipeline; only SSP2-COM is harmonised here, by
-a light global harmoniser anchored to a published 2023 history. See
-[docs/methods.md](docs/methods.md) for details and the SCI-vintage caveat.
+The chapter owns harmonisation and infilling end-to-end. A single
+`gcages.cmip7_scenariomip`-backed pipeline serves SCI, ScenarioMIP CMIP7
+and SSP2-COM: it reads raw IAM `Emissions|*` rows from each ensemble's
+source file, runs them through the chapter-owned stages (drop / interpolate
+/ rename to GCAGES / clean / aneris harmonise at 2023 / infill on the
+full GCAGES driving set), and writes a per-ensemble parquet cache the
+runners read.
+
+```bash
+# Build the caches once per ensemble (chapter-owned harmonisation choices
+# live under data/cmip7/; see docs/data_setup.md).
+pixi run python scripts/harmonise.py --ensemble sci
+pixi run python scripts/harmonise.py --ensemble scenariomip-cmip7
+pixi run python scripts/harmonise.py --ensemble ssp2com
+```
+
+Variable naming through the body of the chapter is GCAGES; the openscm-runner
+adapter rename is applied at the runner boundary only
+(`ar7_ch5.runners.orchestrate.rename_to_openscm_runner`). RCMIP3 is
+concentration-driven, so the harmonisation pipeline does not apply.
+
+The chapter's scientific choices the pipeline encodes (which history,
+which aneris overrides, which infilling DB, infiller method, Halon
+treatment, late-start splice, etc.) are tracked in
+[docs/harmonisation_open_questions.md](docs/harmonisation_open_questions.md)
+with status flags (`DECIDED` / `CONFIGURED-DEFAULT` / `OPEN`). The
+diagnostic script `scripts/validate_sci_vs_shipped.py` reports per-species
+deltas between the chapter pipeline and SCI's shipped
+`Climate Assessment|Infilled|*` namespace as a regression check.
 
 ## Emissions archetypes
 
@@ -204,7 +233,8 @@ jupytext.toml         pairing config for notebooks/ figure scripts
 pyproject.toml        installable package metadata
 src/ar7_ch5/          the package
   load*.py            per-input loaders (SCI, SSP2-COM, ScenarioMIP, RCMIP3)
-  harmonise.py        light global SSP2-COM harmoniser (anchor to 2023 history)
+  harmonisation.py    chapter-owned harmonise + infill pipeline
+  cmip7_inputs.py     loaders for the four CMIP7 chapter inputs (data/cmip7/)
   vetting.py          Riahi 2026 Table SI.1
   feasibility.py      Table SI.2 (feasibility + sustainability)
   classification.py   Table SI.3 (GW0-GW8) + emissions-based extension
@@ -216,6 +246,7 @@ src/ar7_ch5/          the package
   figures.py          config / style / save helpers for figure scripts
   runners/, experiments/
 scripts/              canonical command-line entry points
+  harmonise.py        build the per-ensemble harmonised+infilled cache
   run_scenarios.py    select experiment + models, run the SCMs
   classify.py         vetting + feasibility + sustainability + classification
   compute_archetypes.py  features -> clusters -> representative archetypes

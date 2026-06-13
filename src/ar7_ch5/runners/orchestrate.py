@@ -18,8 +18,10 @@ from collections.abc import Iterable, Sequence
 import openscm_runner.run
 import pandas as pd
 import scmdata
+from gcages.renaming import SupportedNamingConventions, convert_variable_name
 from openscm_runner import RunMode
 from openscm_runner.adapters import CICEROSCMPY2, FAIR2, MAGICC7
+from pandas_openscm.index_manipulation import update_index_levels_func
 
 from . import DEFAULT_MAX_WORKERS, DEFAULT_OUTPUT_VARIABLES, MODEL_NAMES
 from .ciceroscm import build_ciceroscmpy2
@@ -176,4 +178,43 @@ def run_models(
         mode=mode,
         end_year=end_year,
     )
-    return openscm_runner.run.run(adapters, scenarios=scenarios)
+    return openscm_runner.run.run(
+        adapters, scenarios=rename_to_openscm_runner(scenarios)
+    )
+
+
+def rename_to_openscm_runner(scenarios: scmdata.ScmRun) -> scmdata.ScmRun:
+    """Rename ``scenarios`` emissions variables from GCAGES to OPENSCM_RUNNER.
+
+    The chapter pipeline carries GCAGES variable names through the body of
+    the repo (cache parquets, classification, vetting, figures). The
+    openscm-runner adapters consume the OPENSCM_RUNNER convention. This
+    helper applies the rename at the runner boundary so the rest of the
+    chapter doesn't have to think about it.
+
+    Only ``Emissions|*`` variables are touched; non-emissions inputs
+    (e.g. ``Atmospheric Concentrations|*`` used by RCMIP3 concentration-
+    driven experiments) pass through unchanged. Variables already in the
+    OPENSCM_RUNNER convention are also passed through (any conversion
+    that raises is treated as already-renamed). The helper is idempotent.
+    """
+    ts = scenarios.timeseries()
+    if "variable" not in ts.index.names:
+        return scenarios
+
+    def _to_openscm_runner(variable: str) -> str:
+        if not isinstance(variable, str) or not variable.startswith("Emissions|"):
+            return variable
+        try:
+            return convert_variable_name(
+                variable,
+                from_convention=SupportedNamingConventions.GCAGES,
+                to_convention=SupportedNamingConventions.OPENSCM_RUNNER,
+            )
+        except Exception:  # noqa: BLE001 - already renamed / unknown -> pass-through
+            return variable
+
+    renamed = update_index_levels_func(
+        ts, {"variable": _to_openscm_runner}, copy=False
+    )
+    return scmdata.ScmRun(renamed)

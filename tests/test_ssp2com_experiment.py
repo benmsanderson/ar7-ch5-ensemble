@@ -8,17 +8,11 @@ xlsx, history anchor, FaIR calibration).
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from ar7_ch5.experiments.ssp2com import run_ssp2com
 from ar7_ch5.runners import repo_root, resolve_fair_calibration
 
-HISTORY_DIR = Path(
-    "/storage/no-backup-nac/users/bensan/emissions_harmonization_historical/"
-    "data/processed/history-for-harmonisation/zenodo_17845154/db"
-)
 SSP2COM_XLSX = repo_root() / "data" / "ssp2com" / "ssp2-com_world_total.xlsx"
 
 
@@ -34,15 +28,13 @@ def out_dir(tmp_path_factory):
 def result(out_dir):
     if not SSP2COM_XLSX.is_file():
         pytest.skip(f"SSP2-COM xlsx not staged at {SSP2COM_XLSX}")
-    if not HISTORY_DIR.is_dir():
-        pytest.skip(f"History anchor not staged at {HISTORY_DIR}")
     try:
         resolve_fair_calibration()
     except FileNotFoundError as exc:
         pytest.skip(f"FaIR calibration not available: {exc}")
 
     return run_ssp2com(
-        SSP2COM_XLSX, HISTORY_DIR,
+        SSP2COM_XLSX,
         models=["fair"], n_members=2, output_dir=out_dir,
     )
 

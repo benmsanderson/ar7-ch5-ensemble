@@ -19,6 +19,7 @@ from openscm_runner.adapters import CICEROSCMPY2
 from . import (
     DEFAULT_OUTPUT_VARIABLES,
     resolve_ciceroscm_calibration,
+    resolve_ciceroscm_distribution_json,
     resolve_rcmip3_bundle,
 )
 
@@ -33,10 +34,18 @@ def build_ciceroscmpy2(
 ) -> CICEROSCMPY2:
     """Configure CICERO-SCM 2.1.2 from the native calibration distribution.
 
+    The parameter posterior JSON is whichever
+    :func:`resolve_ciceroscm_distribution_json` selects (env var or
+    chapter-staged file), falling back to the calibration directory's
+    bundled posterior. The AR7 FOD uses Marit Sandstad's AR7 v1
+    500-member ``draw_samples_ar7_v1_500.json``, constrained by the
+    assessed climate-sensitivity ranges; see
+    :func:`resolve_ciceroscm_distribution_json` for resolution rules.
+
     Parameters
     ----------
     member_indices
-        Zero-based rows of the 500-member posterior to run. ``None`` runs the
+        Zero-based rows of the posterior to run. ``None`` runs the
         full distribution; the smoke test passes a short range.
     output_variables
         Diagnostics to extract.
@@ -49,7 +58,10 @@ def build_ciceroscmpy2(
         Accepted for interface parity with :func:`build_magicc7`; CICERO-SCM
         runs the full time axis of its native distribution by default.
     """
-    overrides = {} if max_workers is None else {"max_workers": max_workers}
+    overrides: dict = {} if max_workers is None else {"max_workers": max_workers}
+    distribution_json = resolve_ciceroscm_distribution_json()
+    if distribution_json is not None:
+        overrides["distribution_json"] = distribution_json
     return CICEROSCMPY2.from_native_distribution(
         resolve_ciceroscm_calibration(),
         resolve_rcmip3_bundle(),

@@ -14,9 +14,10 @@ figure-only.
 
 ```mermaid
 flowchart LR
-    A[Scenario inputs<br/>SCI · ScenarioMIP · SSP2-COM · RCMIP3] --> B[run_scenarios.py<br/>FaIR · CICERO-SCM · MAGICC]
+    A[Scenario inputs<br/>SCI · ScenarioMIP · SSP2-COM · RCMIP3] --> H[harmonise.py<br/>chapter-owned<br/>aneris + infill]
+    H --> B[run_scenarios.py<br/>FaIR · CICERO-SCM · MAGICC]
     B --> C[classify.py<br/>vetting · feasibility · GW0-GW8]
-    A --> D[compute_archetypes.py<br/>features · clusters · representatives]
+    H --> D[compute_archetypes.py<br/>features · clusters · representatives]
     C --> D
     B --> E[make_figures.py]
     C --> E
@@ -36,8 +37,15 @@ flowchart LR
 ## Status
 
 M1-M8 complete: smoke runs, the SCI ensemble batch on NAC, the vetting /
-feasibility / classification port, SSP2-COM ingestion and the light global
-harmoniser, ScenarioMIP CMIP7, RCMIP3 concentration-driven diagnostics, and
-the emissions-archetypes port (feature extraction, JSON-tunable strategy
-labelling, representative selection, `fig07`). Figures are jupytext-paired
-scripts driven by YAML configuration with a read-only cache reporter.
+feasibility / classification port, SSP2-COM ingestion, ScenarioMIP CMIP7,
+RCMIP3 concentration-driven diagnostics, and the emissions-archetypes
+port (feature extraction, JSON-tunable strategy labelling, representative
+selection, `fig07`). Figures are jupytext-paired scripts driven by YAML
+configuration with a read-only cache reporter.
+
+The chapter now owns harmonisation + infilling end-to-end through a single
+[`gcages.cmip7_scenariomip`-backed pipeline](reference/harmonise.md)
+that serves SCI, ScenarioMIP CMIP7 and SSP2-COM; the scientific choices
+the pipeline encodes (history anchor, aneris overrides, infilling DB,
+Halon strip, etc.) are tracked in
+[harmonisation open questions](harmonisation_open_questions.md).

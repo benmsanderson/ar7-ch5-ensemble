@@ -1,21 +1,21 @@
 """Scenario loaders for the SCI input set.
 
-Reads the SCI 2025 ensemble xlsx (the ``data`` sheet, IAMC wide format) and
-returns a canonical :class:`scmdata.ScmRun` whose variable names match the
-openscm-runner adapter convention.
+Reads the chapter-harmonised+infilled SCI parquet cache (built by
+``scripts/harmonise.py --ensemble sci``) and returns a canonical
+:class:`scmdata.ScmRun` whose variable names follow the **GCAGES**
+convention. The openscm-runner adapter rename is applied at the runner
+boundary (see :mod:`ar7_ch5.runners.orchestrate.rename_to_openscm_runner`).
 
-SCI ships SCM-ready driving emissions pre-harmonised and infilled under the
-``Climate Assessment|Infilled|Emissions|*`` namespace (54 species). This loader
-lifts those directly (no re-harmonisation; see harmonise.py and the brief).
+Convenience accessors for the legacy SCI xlsx (the published ensemble
+file) are retained: :func:`load_sci_data_sheet` returns the raw sheet
+through the local CSV cache; :func:`load_sci_iamc_global` returns the
+wide IAMC frame the classification port (vetting / feasibility / archetype
+features) consumes; :func:`load_sci_raw_iamc` returns the raw IAM
+``Emissions|*`` rows the harmonisation pipeline starts from.
 
-The variable relabelling mirrors the convention the openscm-runner
-``scenarios.load_iamc`` loader used on the ``modernisation/integration`` engine
-branch. The branch we now pin (``feat/fair2-ciceroscmpy2-adapters-and-runmode``)
-does not ship that loader, so the canonicalisation lives here. After stripping
-the ``Climate Assessment|Infilled|`` namespace each body is the short IAMC form
-(``HFC|HFC125``, ``CO2|Energy and Industrial Processes``) that the adapters
-expect once parents are stripped and CO2 sectors mapped to MAGICC names. We keep
-the physical ``Emissions|CO2|AFOLU`` and drop ``[NGHGI]`` (see the brief).
+The shipped ``Climate Assessment|Infilled|*`` namespace used as a
+validation reference (see ``scripts/validate_sci_vs_shipped.py``) is
+identified by :data:`SCI_INFILLED_NAMESPACE`.
 """
 
 from __future__ import annotations
@@ -30,94 +30,6 @@ import scmdata
 from ._rcmip3_naming import canonical_for
 
 SCI_INFILLED_NAMESPACE = "Climate Assessment|Infilled|"
-
-# Parents stripped when present at the head of the variable body (after
-# ``Emissions|``). Longest-prefix-first so ``F-Gases|HFC|`` matches before the
-# bare ``F-Gases|``.
-_PARENT_PATHS = (
-    "F-Gases|HFC|",
-    "F-Gases|PFC|",
-    "F-Gases|CFC|",
-    "F-Gases|",
-    "Montreal Gases|",
-    "HFC|",
-    "PFC|",
-    "CFC|",
-)
-
-_SPECIES_RENAMES = {
-    "HFC4310": "HFC4310mee",
-    "HFC43-10": "HFC4310mee",
-    "SOx": "Sulfur",
-    "NMVOC": "VOC",
-}
-
-# Source CO2 sector names (left) to canonical MAGICC names (right). The
-# physical ``AFOLU`` is kept; ``AFOLU [NGHGI]`` is intentionally absent.
-_CO2_SECTOR_RENAMES = {
-    "Energy and Industrial Processes": "MAGICC Fossil and Industrial",
-    "AFOLU": "MAGICC AFOLU",
-}
-
-# Canonical emissions species the adapters know how to drive. Anything outside
-# this set (e.g. the Montreal gases SCI also infills) is dropped; the adapter's
-# bundle / historical splice fills those as concentration inputs.
-_EMISSIONS_SPECIES = (
-    "CO2|MAGICC Fossil and Industrial",
-    "CO2|MAGICC AFOLU",
-    "CH4",
-    "N2O",
-    "HFC125",
-    "HFC134a",
-    "HFC143a",
-    "HFC227ea",
-    "HFC23",
-    "HFC245fa",
-    "HFC32",
-    "HFC4310mee",
-    "CF4",
-    "C2F6",
-    "C6F14",
-    "SF6",
-    "BC",
-    "OC",
-    "Sulfur",
-    "NOx",
-    "NH3",
-    "VOC",
-    "CO",
-)
-CANONICAL_EMISSIONS = frozenset(f"Emissions|{s}" for s in _EMISSIONS_SPECIES)
-
-# Map FaIR-style variable names (used by scenariomip-paper-plots and Charlie
-# Koven's ar7_wg1_ch5) onto the adapter-canonical IAMC names this repo uses.
-# Species the FaIR convention writes but we don't drive in v1 (additional HFCs,
-# CFCs, halons) are absent; the filter to ``CANONICAL_EMISSIONS`` drops them.
-FAIR_TO_CANONICAL: dict[str, str] = {
-    "BC": "Emissions|BC",
-    "C2F6": "Emissions|C2F6",
-    "C6F14": "Emissions|C6F14",
-    "CF4": "Emissions|CF4",
-    "CH4": "Emissions|CH4",
-    "CO": "Emissions|CO",
-    "CO2 AFOLU": "Emissions|CO2|MAGICC AFOLU",
-    "CO2 FFI": "Emissions|CO2|MAGICC Fossil and Industrial",
-    "HFC-125": "Emissions|HFC125",
-    "HFC-134a": "Emissions|HFC134a",
-    "HFC-143a": "Emissions|HFC143a",
-    "HFC-227ea": "Emissions|HFC227ea",
-    "HFC-23": "Emissions|HFC23",
-    "HFC-245fa": "Emissions|HFC245fa",
-    "HFC-32": "Emissions|HFC32",
-    "HFC-4310mee": "Emissions|HFC4310mee",
-    "N2O": "Emissions|N2O",
-    "NH3": "Emissions|NH3",
-    "NOx": "Emissions|NOx",
-    "OC": "Emissions|OC",
-    "SF6": "Emissions|SF6",
-    "Sulfur": "Emissions|Sulfur",
-    "VOC": "Emissions|VOC",
-}
 
 _REQUIRED_COLUMNS = frozenset({"model", "scenario", "region", "variable", "unit"})
 
@@ -178,21 +90,26 @@ def load_sci_infilled(
     scenario: str | None = None,
     model: str | None = None,
     region: str = "World",
-    sheet: str = "data",
-    to_annual: bool = True,
+    sheet: str = "data",  # legacy; ignored once cache path is resolved
+    to_annual: bool = True,  # legacy; cache is already annual
 ) -> scmdata.ScmRun:
-    """Load SCI infilled driving emissions as a canonical ScmRun.
+    """Load chapter-harmonised+infilled SCI emissions as a canonical ScmRun.
 
-    The returned ScmRun carries both ``pathway_id`` (the chapter pathway
-    identifier, e.g. ``SSP1-19``) and ``scenario`` (the canonical RCMIP3
-    name the runner splices against, e.g. ``ssp119``). See
-    :mod:`ar7_ch5._rcmip3_naming` for the mapping and
-    ``docs/engine_upstream_switch.md`` for why.
+    Reads the parquet cache produced by ``scripts/harmonise.py --ensemble
+    sci``. The returned ScmRun carries both ``pathway_id`` (the chapter
+    pathway identifier, e.g. ``SSP1-19``) and ``scenario`` (the canonical
+    RCMIP3 name the runner splices against, e.g. ``ssp119``). Variable
+    names follow the **GCAGES** convention through the body of the
+    repository; the openscm-runner adapter rename is applied at the
+    runner boundary (see :mod:`ar7_ch5.runners.orchestrate`).
 
     Parameters
     ----------
     path
-        Path to the SCI ensemble ``.xlsx``.
+        Either the SCI ensemble xlsx (the legacy entry point; the sibling
+        ``cache/sci_harmonised_infilled.parquet`` is read), or the
+        cache parquet directly (resolved as-is). ``None`` resolves to the
+        default cache location under ``data/SCI/cache/``.
     scenario, model
         Optional filters. ``scenario`` selects on the chapter pathway id
         (the original SCI scenario value). SCI scenario names are not
@@ -201,35 +118,95 @@ def load_sci_infilled(
     region
         Region to keep (SCI global file is ``World`` only).
     sheet
-        Worksheet to read (SCI convention: ``data``).
+        Legacy parameter; ignored once the parquet cache is read.
     to_annual
-        If ``True`` (default), linearly interpolate the native 5-yearly
-        timeseries onto an annual grid, which is what the SCM adapters drive on.
+        Legacy parameter; ignored because the cache is already on the
+        2023-2100 annual grid.
 
     Returns
     -------
     scmdata.ScmRun
         One timeseries per (model, pathway_id, scenario, variable);
-        variable names canonicalised to the adapter convention.
+        variable names in the GCAGES convention.
     """
-    path = Path(path)
-    df = _prepare_sci_frame(path, region=region, sheet=sheet)
+    del sheet, to_annual  # legacy parameters; document then drop
+    cache_path = _resolve_cache_path(path, ensemble="sci")
+    df = _load_harmonised_cache(cache_path, region=region)
     if scenario is not None:
         df = df[df["scenario"] == scenario]
     if model is not None:
         df = df[df["model"] == model]
-
     if df.empty:
         raise ValueError(
-            f"No SCI infilled rows survived filtering of {path} "
+            f"No SCI rows survived filtering of {cache_path} "
             f"(scenario={scenario!r}, model={model!r}, region={region!r})."
         )
-
     df = _attach_rcmip3_canonical(df)
-    run = scmdata.ScmRun(df)
-    if to_annual:
-        run = _interpolate_annual(run)
-    return run
+    return scmdata.ScmRun(df)
+
+
+_ENSEMBLE_CACHE_FILENAMES: dict[str, str] = {
+    "sci": "sci_harmonised_infilled.parquet",
+    "ssp2com": "ssp2com_harmonised_infilled.parquet",
+    "scenariomip-cmip7": "scenariomip_cmip7_harmonised_infilled.parquet",
+}
+
+
+def _resolve_cache_path(
+    path: str | Path | None, *, ensemble: str
+) -> Path:
+    """Resolve a loader argument to a harmonised+infilled cache parquet.
+
+    * ``None`` -> default location ``data/<ensemble>/cache/<file>.parquet``
+      under the repo root.
+    * A path ending in ``.parquet`` is returned as-is (caller already
+      pointed at a cache parquet, e.g. the test fixture).
+    * Any other path (typically the legacy source-file xlsx / csv) is
+      mapped to its sibling ``cache/<ensemble>_harmonised_infilled.parquet``.
+
+    Raises :class:`FileNotFoundError` with a clear hint to run
+    ``scripts/harmonise.py`` when the resolved cache is absent.
+    """
+    from .runners import repo_root  # local import to avoid cycle
+
+    cache_filename = _ENSEMBLE_CACHE_FILENAMES[ensemble]
+    default_dir = {
+        "sci": repo_root() / "data" / "SCI" / "cache",
+        "ssp2com": repo_root() / "data" / "ssp2com" / "cache",
+        "scenariomip-cmip7": repo_root() / "data" / "scenariomip_cmip7" / "cache",
+    }[ensemble]
+
+    if path is None:
+        cache = default_dir / cache_filename
+    else:
+        path = Path(path)
+        if path.suffix == ".parquet":
+            cache = path
+        else:
+            cache = path.parent / "cache" / cache_filename
+
+    if not cache.is_file():
+        raise FileNotFoundError(
+            f"Harmonised+infilled cache not found: {cache}. "
+            f"Build it with: pixi run python scripts/harmonise.py --ensemble {ensemble}"
+        )
+    return cache
+
+
+def _load_harmonised_cache(cache: Path, *, region: str) -> pd.DataFrame:
+    """Read a harmonised+infilled parquet cache into a tidy IAMC frame.
+
+    The parquet stores the multi-indexed wide DataFrame written by
+    :func:`ar7_ch5.harmonisation.harmonise_and_infill`. This helper
+    returns a tidy frame keyed on ``model, scenario, region, variable,
+    unit`` with integer year columns -- the shape ``scmdata.ScmRun``
+    consumes. The ``region`` filter is applied here so downstream code
+    doesn't have to.
+    """
+    wide = pd.read_parquet(cache)
+    if region in wide.index.get_level_values("region").unique():
+        wide = wide.xs(region, level="region", drop_level=False)
+    return wide.reset_index()
 
 
 def iter_sci_infilled(
@@ -240,22 +217,21 @@ def iter_sci_infilled(
     to_annual: bool = True,
     pathways: Iterable[tuple[str, str]] | None = None,
 ) -> Iterator[tuple[str, str, scmdata.ScmRun]]:
-    """Yield ``(model, pathway_id, ScmRun)`` for every pathway in the SCI file.
+    """Yield ``(model, pathway_id, ScmRun)`` for every pathway in the SCI cache.
 
-    Reads and canonicalises the worksheet once (via the CSV cache), then
-    groups by ``(model, scenario)`` (the chapter pathway), attaches
-    ``pathway_id`` + canonical ``scenario`` meta columns, and yields one
-    driving-emissions ScmRun per pathway. This is the batch entry point:
-    it avoids re-reading the cache once per scenario, which
-    ``load_sci_infilled`` would do when looped.
+    Reads the harmonised+infilled parquet cache once, groups by
+    ``(model, scenario)`` (the chapter pathway), attaches ``pathway_id``
+    + canonical ``scenario`` meta columns, and yields one driving-emissions
+    ScmRun per pathway. Variable names follow the GCAGES convention.
 
     If ``pathways`` is given, only ``(model, pathway_id)`` pairs in
     that set are yielded; the others are skipped silently. Use this to
     restrict the batch to e.g. the vetted subset (see
     :func:`vetted_sci_pathways`).
     """
-    path = Path(path)
-    df = _prepare_sci_frame(path, region=region, sheet=sheet)
+    del sheet, to_annual  # legacy parameters; document then drop
+    cache_path = _resolve_cache_path(path, ensemble="sci")
+    df = _load_harmonised_cache(cache_path, region=region)
     wanted: set[tuple[str, str]] | None = (
         {(str(m), str(p)) for m, p in pathways} if pathways is not None else None
     )
@@ -263,10 +239,7 @@ def iter_sci_infilled(
         if wanted is not None and (str(model), str(pathway_id)) not in wanted:
             continue
         group = _attach_rcmip3_canonical(group)
-        run = scmdata.ScmRun(group)
-        if to_annual:
-            run = _interpolate_annual(run)
-        yield str(model), str(pathway_id), run
+        yield str(model), str(pathway_id), scmdata.ScmRun(group)
 
 
 def vetted_sci_pathways(
@@ -306,74 +279,45 @@ def _attach_rcmip3_canonical(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _prepare_sci_frame(
-    path: Path, *, region: str, sheet: str
+def load_sci_raw_iamc(
+    path: str | Path,
+    *,
+    region: str = "World",
+    sheet: str = "data",
 ) -> pd.DataFrame:
-    """Load the SCI sheet and return the canonicalised infilled-emissions rows.
+    """Return the raw IAM ``Emissions|*`` rows from the SCI ensemble file.
 
-    Strips the infilled namespace, maps variable and unit names to the adapter
-    convention, keeps ``region`` only, and drops anything outside
-    :data:`CANONICAL_EMISSIONS`. All ``(model, scenario)`` pairs are retained;
-    callers filter further.
+    Output shape matches what :mod:`ar7_ch5.harmonisation` consumes: a
+    MultiIndex of ``(model, scenario, region, variable, unit)`` and integer
+    year columns, carrying the ``CMIP7_SCENARIOMIP`` variable-naming
+    convention as published by SCI. No filtering beyond the variable-prefix
+    and region restriction; the harmonisation pipeline handles late-start
+    drops, interpolation, naming and vetting.
+
+    This is the entry point for the chapter's chapter-owned harmonisation
+    path (PR #26's reference implementation), as distinct from
+    :func:`load_sci_infilled` which lifts SCI's shipped
+    ``Climate Assessment|Infilled|*`` namespace.
     """
-    df = load_sci_data_sheet(path, sheet=sheet)
+    df = load_sci_data_sheet(Path(path), sheet=sheet)
     df.columns = [c.lower() if isinstance(c, str) else c for c in df.columns]
     missing = _REQUIRED_COLUMNS - set(df.columns)
     if missing:
         raise ValueError(
             f"{path} is missing required IAMC columns: {sorted(missing)}."
         )
-
-    df = df[df["variable"].astype(str).str.startswith(SCI_INFILLED_NAMESPACE)]
-    df = df.copy()
-    df["variable"] = df["variable"].str.slice(len(SCI_INFILLED_NAMESPACE))
-    df["variable"] = df["variable"].map(_canonicalise_variable)
-    df["unit"] = df["unit"].map(_canonicalise_unit)
-
-    df = df[df["region"] == region]
-    df = df[df["variable"].isin(CANONICAL_EMISSIONS)]
-    return df
-
-
-def _interpolate_annual(run: scmdata.ScmRun) -> scmdata.ScmRun:
-    years = range(run["year"].min(), run["year"].max() + 1)
-    target = [pd.Timestamp(y, 1, 1) for y in years]
-    return run.interpolate(target)
-
-
-def _canonicalise_unit(u: str) -> str:
-    if not isinstance(u, str):
-        return u
-    if "HFC43-10" in u:
-        u = u.replace("HFC43-10", "HFC4310mee")
-    elif "HFC4310" in u and "HFC4310mee" not in u:
-        u = u.replace("HFC4310", "HFC4310mee")
-    if "SOx" in u:
-        u = u.replace("SOx", "Sulfur")
-    if "NMVOC" in u:
-        u = u.replace("NMVOC", "VOC")
-    return u
-
-
-def _canonicalise_variable(name: str) -> str:
-    if not isinstance(name, str) or not name.startswith("Emissions|"):
-        return name
-    body = name[len("Emissions|") :]
-
-    if body.startswith("CO2|"):
-        sector = body[len("CO2|") :]
-        mapped = _CO2_SECTOR_RENAMES.get(sector)
-        if mapped is not None:
-            return f"Emissions|CO2|{mapped}"
-        return name  # let the allowlist drop unmapped CO2 subcategories
-
-    for parent in _PARENT_PATHS:
-        if body.startswith(parent):
-            body = body[len(parent) :]
-            break
-
-    body = _SPECIES_RENAMES.get(body, body)
-    return f"Emissions|{body}"
+    df = df.set_index(["model", "scenario", "region", "variable", "unit"])
+    # Variable prefix filter via the index level. ``Emissions**`` matches
+    # every ``Emissions|...`` row including the ``Climate Assessment|...``
+    # namespace (which we exclude explicitly), so we use a narrower prefix
+    # match here.
+    keep = df.index.get_level_values("variable").astype(str).str.startswith(
+        "Emissions|"
+    )
+    region_match = df.index.get_level_values("region") == region
+    out = df.loc[keep & region_match]
+    out.columns = out.columns.astype(int)
+    return out
 
 
 def available_sci_scenarios(

@@ -79,6 +79,7 @@ nav:
       - Emissions archetypes: pipeline/archetypes.md
       - Building figures: pipeline/figures.md
   - Methods: methods.md
+  - Harmonisation open questions: harmonisation_open_questions.md
   - Engine / upstream switch: engine_upstream_switch.md
   - Conventions: conventions.md
   - API reference:

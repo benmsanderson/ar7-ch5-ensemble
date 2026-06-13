@@ -107,12 +107,15 @@ modules.
   `scripts/prepare_ssp2com_for_fair.py` and `scripts/validate_ssp2com.py`
   are the closest existing FaIR-side reference.
 
-- **Shared harmonisation function.** Direction: extract the SSP2-COM
-  harmonisation logic into a shared utility that both this repo and Charlie's
-  ar7_wg1_ch5 import. First session task is to scope where that utility
-  lives (in this repo, in a small standalone package, or upstreamed somewhere
-  else), then port Charlie's harmonisation choices into it, with a
-  regression test against his current FaIR outputs.
+- **Shared harmonisation function.** Resolved (2026-06-09): the chapter
+  owns harmonisation + infilling itself, via
+  `gcages.cmip7_scenariomip` (aneris-backed). One pipeline serves SCI,
+  ScenarioMIP CMIP7 and SSP2-COM. The four chapter-side input files
+  (history, aneris overrides, infilling DB, GHG inversions) live under
+  `data/cmip7/` and encode the chapter's scientific choices, tracked in
+  `docs/harmonisation_open_questions.md`. The cross-repo extraction
+  question disappears: Charlie can import `ar7_ch5.harmonisation` if he
+  wants the same path.
 
 - **Ben's `scenariomip-paper-plots`**
   (github.com/benmsanderson/scenariomip-paper-plots, archived at Zenodo

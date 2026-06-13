@@ -1,15 +1,13 @@
 """SSP2-COM (community SSP2) experiment.
 
-One pathway, three SCMs. The world-total SSP2-COM xlsx is loaded
-(:mod:`ar7_ch5.load_ssp2com`), harmonised to the CMIP7 2023 anchor
-(:mod:`ar7_ch5.harmonise`), then handed to the orchestrator
-(:func:`ar7_ch5.runners.orchestrate.run_models`). One NetCDF per
-(pathway, SCM) is written under ``<output_dir>/<scm>/ssp2com_<pathway_id>.nc``,
-matching the SCI / ScenarioMIP / RCMIP3 layout so the cache reporter
-and :mod:`ar7_ch5.metrics` see one shape across experiments.
-
-Validation against Charlie Koven's FaIR-only SSP2-COM output lives in a
-follow-up commit.
+One pathway, three SCMs. The SSP2-COM driving emissions are read from
+the chapter harmonise+infill cache (``data/ssp2com/cache/...parquet``,
+built via ``scripts/harmonise.py --ensemble ssp2com``) and handed to the
+orchestrator (:func:`ar7_ch5.runners.orchestrate.run_models`). One
+NetCDF per (pathway, SCM) is written under
+``<output_dir>/<scm>/ssp2com_<pathway_id>.nc``, matching the SCI /
+ScenarioMIP / RCMIP3 layout so the cache reporter and
+:mod:`ar7_ch5.metrics` see one shape across experiments.
 """
 
 from __future__ import annotations
@@ -19,12 +17,6 @@ from pathlib import Path
 
 import scmdata
 
-from ..harmonise import (
-    DEFAULT_ANCHOR_YEAR,
-    DEFAULT_CONVERGENCE_YEAR,
-    harmonise,
-    load_history_anchor,
-)
 from ..load_ssp2com import load_ssp2com_world_total
 from ..runners import (
     DEFAULT_MAX_WORKERS,
@@ -39,74 +31,57 @@ NC_DIMENSIONS = ("run_id", "region", "variable")
 
 
 def run_ssp2com(
-    xlsx: str | Path,
-    history_dir: str | Path,
+    xlsx: str | Path | None = None,
     *,
     models: Sequence[str] = MODEL_NAMES,
     n_members: int | None = 200,
     output_dir: str | Path = "outputs/ssp2com",
     output_variables: Iterable[str] = DEFAULT_OUTPUT_VARIABLES,
     max_workers: int | None = DEFAULT_MAX_WORKERS,
-    anchor_year: int = DEFAULT_ANCHOR_YEAR,
-    convergence_year: int = DEFAULT_CONVERGENCE_YEAR,
 ) -> scmdata.ScmRun:
-    """Load SSP2-COM, harmonise, run through ``models``, write per-SCM NetCDFs.
+    """Load SSP2-COM from the chapter cache, run through ``models``, write NetCDFs.
 
     Parameters
     ----------
     xlsx
-        Path to ``ssp2-com_world_total.xlsx``.
-    history_dir
-        Directory of the published global history anchor (Zenodo 17845154,
-        sharded feather store).
+        Either the SSP2-COM xlsx (resolves to its sibling cache parquet)
+        or the cache parquet directly. ``None`` resolves to the default
+        cache location under ``data/ssp2com/cache/``.
     models
         SCMs to run.
     n_members
         Members per SCM. Default 200 (matches the SCI batch convention).
     output_dir
-        Root for per-SCM NetCDFs (``<output_dir>/<scm>.nc``). Created if
-        absent.
+        Root for per-SCM NetCDFs (``<output_dir>/<scm>/<file>.nc``).
+        Created if absent.
     output_variables
         Diagnostics each adapter extracts.
     max_workers
         Worker-process cap per model run (see
         :data:`ar7_ch5.runners.DEFAULT_MAX_WORKERS`).
-    anchor_year, convergence_year
-        See :func:`ar7_ch5.harmonise.harmonise`.
 
     Returns
     -------
     The combined :class:`scmdata.ScmRun` (all SCMs, all members), so callers
     can do further analysis without re-reading the NetCDFs.
     """
-    print(f"Loading SSP2-COM from {xlsx}...")
+    print(f"Loading SSP2-COM from {xlsx or 'default cache'}...")
     scenario = load_ssp2com_world_total(xlsx)
     print(
         f"  {len(scenario.get_unique_meta('variable'))} species, "
         f"{scenario['year'].min()}-{scenario['year'].max()}."
     )
 
-    print(f"Loading history anchor from {history_dir}...")
-    history = load_history_anchor(history_dir)
-
-    print(
-        f"Harmonising at {anchor_year} -> convergence at {convergence_year}..."
-    )
-    harmonised = harmonise(
-        scenario, history,
-        anchor_year=anchor_year, convergence_year=convergence_year,
-    )
-
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
 
-    pathway_ids = sorted(harmonised.get_unique_meta("pathway_id"))
+    pathway_ids = sorted(scenario.get_unique_meta("pathway_id"))
     pieces: list[scmdata.ScmRun] = []
     for scm in models:
         scm_dir = out / scm
         scm_dir.mkdir(parents=True, exist_ok=True)
         for pid in pathway_ids:
-            one_pathway = harmonised.filter(pathway_id=pid)
+            one_pathway = scenario.filter(pathway_id=pid)
             print(f"Running {scm} on {pid} at n_members={n_members}...")
             result = run_models(
                 one_pathway, [scm],
@@ -121,5 +96,5 @@ def run_ssp2com(
             pieces.append(result)
 
     return scmdata.run_append(pieces) if pieces else scmdata.ScmRun(
-        harmonised.timeseries()
+        scenario.timeseries()
     )

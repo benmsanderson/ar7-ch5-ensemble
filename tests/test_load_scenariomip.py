@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import pytest
 
-from ar7_ch5.load import CANONICAL_EMISSIONS
 from ar7_ch5.load_scenariomip import (
     SCENARIOS,
     load_scenariomip_emissions,
@@ -39,20 +38,20 @@ def test_seven_pathways(run):
 
 
 def test_canonical_emissions_only(run):
-    """All variables fall in the adapter-canonical set."""
+    """52 species after chapter harmonise + infill, in GCAGES naming."""
     variables = set(run.get_unique_meta("variable"))
-    assert variables.issubset(CANONICAL_EMISSIONS)
-    # ScenarioMIP carries 23 species after canonicalisation, the full set
-    # we drive.
-    assert len(variables) == 23
+    # 52 = COMPLETE_EMISSIONS_INPUT_VARIABLES_GCAGES from gcages.
+    assert len(variables) == 52
+    assert "Emissions|CO2|Fossil" in variables
+    assert "Emissions|CO2|Biosphere" in variables
 
 
-def test_annual_axis_clipped_to_2100(run):
-    """Half-year FaIR convention truncates to integer years and clips to 2100."""
+def test_annual_axis_2023_to_2100(run):
+    """Chapter cache is the 2023-2100 annual harmonised+infilled window."""
     years = sorted(set(run["year"]))
-    assert years[0] == 1750
+    assert years[0] == 2023
     assert years[-1] == 2100
-    assert years == list(range(1750, 2101))
+    assert years == list(range(2023, 2101))
 
 
 def test_subset_filter():
@@ -70,3 +69,27 @@ def test_unknown_scenario_raises():
         pytest.skip(f"ScenarioMIP CSV not staged at {CSV}")
     with pytest.raises(ValueError, match="not present"):
         load_scenariomip_emissions(CSV, scenarios=("XX_NOT_REAL",))
+
+
+def test_iam_extension_spliced_past_2100():
+    """end_year > 2100 splices the IAM emissions extension onto the cache.
+
+    For ``Emissions|CO2|Fossil`` (an IAM-reported species), the loaded
+    series past 2100 must differ from the 2100 chapter value (the IAM
+    trajectory keeps changing); for ``Emissions|Halon1202`` (chapter
+    stripped + infilled, IAM doesn't report past 2100), values must hold
+    flat at the 2100 chapter value.
+    """
+    if not CSV.is_file():
+        pytest.skip(f"ScenarioMIP CSV not staged at {CSV}")
+    run = load_scenariomip_emissions(CSV, scenarios=("VL",), end_year=2500)
+    assert run.time_points.years().max() == 2500
+    ts = run.filter(pathway_id="VL").timeseries().reset_index()
+    year_cols = [c for c in ts.columns if hasattr(c, "year")]
+    by_year = {c.year: c for c in year_cols}
+    co2 = ts[ts["variable"] == "Emissions|CO2|Fossil"].iloc[0]
+    halon = ts[ts["variable"] == "Emissions|Halon1202"].iloc[0]
+    # IAM-reported species: 2200 differs from 2100.
+    assert co2[by_year[2200]] != co2[by_year[2100]]
+    # Chapter-stripped species: 2200 holds flat at 2100.
+    assert halon[by_year[2200]] == halon[by_year[2100]]
