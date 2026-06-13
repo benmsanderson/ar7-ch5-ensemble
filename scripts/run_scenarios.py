@@ -151,6 +151,17 @@ def build_parser() -> argparse.ArgumentParser:
         f"{DEFAULT_MAX_WORKERS}.",
     )
     parser.add_argument(
+        "--ciceroscm-distribution",
+        type=Path,
+        default=None,
+        help="Override the CICERO-SCM parameter posterior JSON for this run. "
+        "Sets AR7_CICEROSCM_DISTRIBUTION_JSON for the adapter. Default: "
+        "the chapter-staged file at data/calibration/"
+        "ciceroscm_distribution.json (the AR7 v1 500-member set for the "
+        "FOD), or the bundled AR6 posterior if neither is set. See "
+        "ar7_ch5.runners.resolve_ciceroscm_distribution_json.",
+    )
+    parser.add_argument(
         "--output",
         default="outputs",
         help="Directory for run output (gitignored).",
@@ -160,6 +171,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+
+    if args.ciceroscm_distribution is not None:
+        import os
+        os.environ["AR7_CICEROSCM_DISTRIBUTION_JSON"] = str(
+            args.ciceroscm_distribution.resolve()
+        )
 
     if args.experiment == "ssp2com":
         return _run_ssp2com(args)

@@ -84,6 +84,36 @@ def resolve_ciceroscm_calibration() -> Path:
     return _calibration_dir() / "ciceroscm-rcmip3-v1.0.0"
 
 
+def resolve_ciceroscm_distribution_json() -> Path | None:
+    """Optional override for the CICERO-SCM parameter posterior JSON.
+
+    The native CICERO-SCM calibration directory ships its own posterior
+    (``calibrated_ciceroscm_ensemble.json``, AR6 600-member). For the
+    AR7 first-order draft the chapter uses Marit Sandstad's AR7 v1
+    500-member ``draw_samples`` JSON, constrained by the AR7 assessed
+    climate-sensitivity ranges, sourced from
+    ``cscm-calibrate/draw_samples_archive/``.
+
+    Resolution order:
+
+    1. ``AR7_CICEROSCM_DISTRIBUTION_JSON`` env var (highest precedence,
+       intended for per-run overrides or non-NAC machines).
+    2. ``data/calibration/ciceroscm_distribution.json`` if present
+       (the chapter-staged default for the FOD; typically a symlink to
+       Marit's archive on NAC).
+    3. ``None``: the adapter discovers the posterior bundled with the
+       calibration directory via its native glob -- the legacy AR6
+       behaviour, preserved when neither override is set.
+    """
+    env = os.environ.get("AR7_CICEROSCM_DISTRIBUTION_JSON")
+    if env:
+        return Path(env)
+    staged = _calibration_dir() / "ciceroscm_distribution.json"
+    if staged.exists():
+        return staged
+    return None
+
+
 def resolve_rcmip3_bundle() -> Path:
     """Path to the RCMIP Phase 3 protocol bundle (Zenodo 20430630).
 

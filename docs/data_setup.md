@@ -189,7 +189,35 @@ four files lifted from the CMIP7 ScenarioMIP workflow. Three are small
 See [`docs/harmonisation_open_questions.md`](harmonisation_open_questions.md)
 for what each file encodes scientifically and the open questions for SOD.
 
-## 7. Everything else (Zenodo)
+## 7. CICERO-SCM parameter posterior (chapter override for the FOD)
+
+The CICERO-SCM Zenodo calibration directory ships its own posterior
+(`calibrated_ciceroscm_ensemble.json`, the AR6 600-member set). For the
+AR7 first-order draft the chapter swaps in Marit Sandstad's AR7 v1
+500-member draws constrained by the assessed climate-sensitivity
+ranges. The override resolver is
+`ar7_ch5.runners.resolve_ciceroscm_distribution_json` and reads, in
+precedence order:
+
+1. `AR7_CICEROSCM_DISTRIBUTION_JSON` env var (per-run override).
+2. `data/calibration/ciceroscm_distribution.json` (the chapter-staged
+   default; typically a symlink).
+3. `None` -- the adapter discovers the posterior bundled with the
+   calibration directory (legacy AR6 behaviour, used when neither
+   override is set).
+
+On NAC, stage the FOD posterior as a symlink:
+
+```bash
+ln -sf /div/no-backup-nac/users/masan/GRAFITE/cscm-calibrate/draw_samples_archive/draw_samples_ar7_v1_500.json \
+       data/calibration/ciceroscm_distribution.json
+```
+
+Pass `--ciceroscm-distribution <path>` to `scripts/run_scenarios.py` to
+override per-run. The Zenodo calibration directory itself stays
+untouched, so the existing fetch workflow is unaffected.
+
+## 8. Everything else (Zenodo)
 
 The remaining inputs are fetched from their Zenodo archives:
 
